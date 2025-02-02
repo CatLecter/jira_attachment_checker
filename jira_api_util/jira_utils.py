@@ -34,7 +34,7 @@ class JiraAPIHelper:
         result = json.loads(r.text)
         return result
 
-    def create_project(self, project_name: str, project_type: str, project_lead: str) -> None:
+    def create_project(self, project_name: str, project_type: str, project_lead: str) -> dict:
         data = {
             'key': project_name.upper(),
             'description': lorem.sentence(),
@@ -43,30 +43,40 @@ class JiraAPIHelper:
             'lead': project_lead
         }
         r = self._session.post('/project/', json=data)
-        print(r.text)
-        print(r.status_code)
+        return json.loads(r.text)
 
-    def create_issue(self):
+    def create_issue(self,
+                     project_key: str,
+                     project_summary: str,
+                     project_description: str,
+                     issue_type: str = 'Task') -> dict:
         data = {
             "fields": {
                 "project":
                     {
-                        "key": "TEST"
+                        "key": project_key
                     },
-                "summary": "REST EXAMPLE",
-                "description": "Creating an issue via REST API",
+                "summary": project_summary,
+                "description": project_description,
                 "issuetype": {
-                    "name": "Task"
+                    "name": issue_type
                 }
             }
         }
         r = self._session.post('/issue', json=data)
-        print(r.status_code)
-        # print(r.text)
-        d = json.loads(r.text)
-        print(d)
+        return json.loads(r.text)
 
-    def add_attachment(self, issue_id_or_key: str, attachment: bytes):
+    def add_comment_to_issue(self, issue_id_or_key: str, comment: str) -> dict:
+        data = {
+            'body': comment
+        }
+        r = self._session.post(f'/issue/{issue_id_or_key}/comment', json=data)
+        print(r.text)
+        print(r.status_code)
+        return json.loads(r.text)
+
+    def add_attachment(self, issue_id_or_key: str, attachment: bytes) -> dict:
         data = {'file': ('image.png', attachment, 'image/png')}
         headers = {"X-Atlassian-Token": "no-check"}
         r = self._session.post(f'/issue/{issue_id_or_key}/attachments', headers=headers, files=data)
+        return json.loads(r.text)

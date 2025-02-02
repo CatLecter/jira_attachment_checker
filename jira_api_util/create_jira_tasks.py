@@ -13,7 +13,8 @@ def main(helper: JiraAPIHelper, im: ImageManager):
     # print(helper.get_all_projects())
     # helper.create_project('test2', 'software', 'admin')
     # print(helper.get_project_types())
-    helper.create_issue()
+    # helper.create_issue()
+    print(helper.add_comment_to_issue('TEST-24', 'test comment'))
 
 
 if __name__ == '__main__':
