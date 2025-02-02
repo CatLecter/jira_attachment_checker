@@ -1,8 +1,7 @@
 import json
 
-import requests
-from requests import Session
 from lorem_text import lorem
+from requests import Session
 
 
 class JiraSession(Session):
@@ -16,8 +15,9 @@ class JiraSession(Session):
 
 
 class JiraAPIHelper:
-    def __init__(self, session: JiraSession):
-        self._session = session
+    def __init__(self, base_url: str, login: str, password: str):
+        self._session = JiraSession(base_url)
+        self._session.auth = (login, password)
 
     def get_project_types(self) -> dict:
         r = self._session.get('/project/type')
@@ -47,7 +47,6 @@ class JiraAPIHelper:
         print(r.status_code)
 
     def create_issue(self):
-
         data = {
             "fields": {
                 "project":
@@ -71,32 +70,3 @@ class JiraAPIHelper:
         data = {'file': ('image.png', attachment, 'image/png')}
         headers = {"X-Atlassian-Token": "no-check"}
         r = self._session.post(f'/issue/{issue_id_or_key}/attachments', headers=headers, files=data)
-
-
-def get_random_image(width: int, height: int) -> bytes:
-    r = requests.get(f'https://loremflickr.com/json/{width}/{height}')
-    d = json.loads(r.text)
-    img_url = d['rawFileUrl']
-    img_r = requests.get(img_url)
-    return img_r.content
-
-
-def main(helper: JiraAPIHelper):
-    # for i in range(10):
-    #     helper.create_project(f'TEST-PROJECT{i}')
-    # print(helper.get_project('TEST'))
-    # print(helper.get_issue('TEST-24'))
-    # img_data = get_random_image(300, 300)
-    # issue = helper.get_issue('TEST-24')
-    # helper.add_attachment('TEST-24', img_data)
-    # print(helper.get_all_projects())
-    # helper.create_project('test2', 'software', 'admin')
-    # print(helper.get_project_types())
-    helper.create_issue()
-
-
-if __name__ == '__main__':
-    s = JiraSession(base_url='http://127.0.0.1:8080/rest/api/latest')
-    s.auth = ('admin', 'Qwerty123')
-    h = JiraAPIHelper(s)
-    main(h)
