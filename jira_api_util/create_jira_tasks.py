@@ -2,19 +2,23 @@ from jira_api_util.jira_utils import JiraAPIHelper
 from jira_api_util.utils import LoremFlickrManager, ImageManager
 
 
-def main(helper: JiraAPIHelper, im: ImageManager):
-    # for i in range(10):
-    #     helper.create_project(f'TEST-PROJECT{i}')
-    # print(helper.get_project('TEST'))
-    # print(helper.get_issue('TEST-24'))
-    # img_data = get_random_image(300, 300)
-    # issue = helper.get_issue('TEST-24')
-    # helper.add_attachment('TEST-24', img_data)
-    # print(helper.get_all_projects())
-    # helper.create_project('test2', 'software', 'admin')
-    # print(helper.get_project_types())
-    # helper.create_issue()
-    print(helper.add_comment_to_issue('TEST-24', 'test comment'))
+def main(helper: JiraAPIHelper, image_manager: ImageManager):
+    project_num = 3
+    issues_per_project = 5
+    comments_per_project = 5
+    project_dicts = []
+    for i in range(project_num):
+        project_dicts.append(helper.create_project(f'TEST-PROJECT{i}',
+                                                   'software',
+                                                   'admin'))
+    issue_dicts = []
+    for pd in project_dicts:
+        for i in range(issues_per_project):
+            pass  # add issue to project
+
+    for issue in issue_dicts:
+        for i in range(comments_per_project):
+            pass  # add attachment and comment with link to attachment (optional)
 
 
 if __name__ == '__main__':
