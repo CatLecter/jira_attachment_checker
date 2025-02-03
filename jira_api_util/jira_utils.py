@@ -3,6 +3,8 @@ import json
 from lorem_text import lorem
 from requests import Session
 
+from jira_api_util.models import Project, ProjectType, Issue, Comment, Attachment
+
 
 class JiraSession(Session):
     def __init__(self, base_url: str = None):
@@ -19,22 +21,39 @@ class JiraAPIHelper:
         self._session = JiraSession(base_url)
         self._session.auth = (login, password)
 
-    def get_project_types(self) -> dict:
+    def get_project_types(self) -> list[ProjectType]:
         r = self._session.get('/project/type')
-        result = json.loads(r.text)
+        types = json.loads(r.text)
+        result = []
+        for t in types:
+            result.append(ProjectType(t['key'], t['FormattedKey']))
         return result
 
-    def get_all_projects(self) -> dict:
+    def get_all_projects(self) -> list[Project]:
         r = self._session.get(f'/project')
-        result = json.loads(r.text)
+        response_dict = json.loads(r.text)
+        result = []
+        for p in response_dict:
+            result.append(Project(p['id'], p['name'], p['key'], p['self']))
         return result
 
-    def get_issue(self, issue_name: str) -> dict:
+    def get_project(self, id_or_key: str) -> Project:
+        r = self._session.get(f'/project/{id_or_key}')
+        response_dict = json.loads(r.text)
+        return Project(response_dict['id'],
+                       response_dict['name'],
+                       response_dict['key'],
+                       response_dict['self'])
+
+    def get_issue(self, issue_name: str) -> Issue:
         r = self._session.get(f'/issue/{issue_name}')
-        result = json.loads(r.text)
-        return result
+        response_dict = json.loads(r.text)
+        return Issue(response_dict['id'],
+                     response_dict['key'],
+                     response_dict['self'],
+                     response_dict['fields']['project']['id'])
 
-    def create_project(self, project_name: str, project_type: str, project_lead: str) -> dict:
+    def create_project(self, project_name: str, project_type: str, project_lead: str) -> Project:
         data = {
             'key': project_name.upper(),
             'description': lorem.sentence(),
@@ -43,40 +62,53 @@ class JiraAPIHelper:
             'lead': project_lead
         }
         r = self._session.post('/project/', json=data)
-        return json.loads(r.text)
+        d = json.loads(r.text)
+        project = Project(d['id'], project_name, d['key'], d['self'])
+        return project
 
     def create_issue(self,
                      project_key: str,
-                     project_summary: str,
-                     project_description: str,
-                     issue_type: str = 'Task') -> dict:
+                     summary: str,
+                     description: str,
+                     issue_type: str = 'Task') -> Issue:
         data = {
             "fields": {
                 "project":
                     {
                         "key": project_key
                     },
-                "summary": project_summary,
-                "description": project_description,
+                "summary": summary,
+                "description": description,
                 "issuetype": {
                     "name": issue_type
                 }
             }
         }
         r = self._session.post('/issue', json=data)
-        return json.loads(r.text)
+        response_dict = json.loads(r.text)
+        return Issue(response_dict['id'],
+                     response_dict['key'],
+                     response_dict['self'],
+                     self.get_project(project_key).id)
 
-    def add_comment_to_issue(self, issue_id_or_key: str, comment: str) -> dict:
+    def add_comment_to_issue(self, issue_id_or_key: str, comment: str) -> Comment:
         data = {
             'body': comment
         }
         r = self._session.post(f'/issue/{issue_id_or_key}/comment', json=data)
-        print(r.text)
-        print(r.status_code)
-        return json.loads(r.text)
+        response_dict = json.loads(r.text)
+        return Comment(response_dict['id'],
+                       response_dict['body'],
+                       response_dict['self'],
+                       issue_id_or_key)
 
-    def add_attachment(self, issue_id_or_key: str, attachment: bytes) -> dict:
+    def add_attachment(self, issue_id_or_key: str, attachment: bytes) -> Attachment:
         data = {'file': ('image.png', attachment, 'image/png')}
         headers = {"X-Atlassian-Token": "no-check"}
         r = self._session.post(f'/issue/{issue_id_or_key}/attachments', headers=headers, files=data)
-        return json.loads(r.text)
+        response_dict = json.loads(r.text)
+        return Attachment(response_dict['id'],
+                          response_dict['filename'],
+                          response_dict['content'],
+                          response_dict['size'],
+                          response_dict['mimeType'])
