@@ -1,3 +1,6 @@
+import os.path
+
+from dotenv import load_dotenv
 from lorem_text import lorem
 
 from jira_api_util.jira_utils import JiraAPIHelper
@@ -33,6 +36,9 @@ def main(helper: JiraAPIHelper, image_manager: ImageManager):
 
 
 if __name__ == '__main__':
-    h = JiraAPIHelper('http://127.0.0.1:8080/rest/api/latest', 'admin', 'Qwerty123')
+    load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
+    h = JiraAPIHelper(os.environ.get('BASE_URL', ''),
+                      os.environ.get('JIRA_ADMIN', ''),
+                      os.environ.get('JIRA_PASSWORD', ''))
     im = LoremFlickrManager()
     main(h, im)
