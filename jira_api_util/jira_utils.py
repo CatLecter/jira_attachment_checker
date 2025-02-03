@@ -106,7 +106,7 @@ class JiraAPIHelper:
         data = {'file': (filename, attachment, 'image/png')}
         headers = {"X-Atlassian-Token": "no-check"}
         r = self._session.post(f'/issue/{issue_id_or_key}/attachments', headers=headers, files=data)
-        response_dict = json.loads(r.text)
+        response_dict = json.loads(r.text)[0]
         return Attachment(response_dict['id'],
                           response_dict['filename'],
                           response_dict['content'],
