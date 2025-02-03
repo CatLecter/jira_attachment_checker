@@ -102,8 +102,8 @@ class JiraAPIHelper:
                        response_dict['self'],
                        issue_id_or_key)
 
-    def add_attachment(self, issue_id_or_key: str, attachment: bytes) -> Attachment:
-        data = {'file': ('image.png', attachment, 'image/png')}
+    def add_attachment(self, issue_id_or_key: str, attachment: bytes, filename: str) -> Attachment:
+        data = {'file': (filename, attachment, 'image/png')}
         headers = {"X-Atlassian-Token": "no-check"}
         r = self._session.post(f'/issue/{issue_id_or_key}/attachments', headers=headers, files=data)
         response_dict = json.loads(r.text)
