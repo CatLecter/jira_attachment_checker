@@ -2,7 +2,8 @@ import asyncio
 
 import asyncpg
 
-from jira_db_extractor.connectors.postgres_connector import PGConnector
+from jira_db_extractor.connectors.connectors import PGConnector, SQLiteConnector
+from jira_db_extractor.connectors.repositories import AttachmentPGRepository, AttachmentSQLiteRepository
 
 '''
 select fa.id, fa.filename, ji.issuenum from fileattachment fa join jiraissue ji on ji.id = fa.issueid join project p on p.id = ji.project where p.pkey = 'PRG';
@@ -17,13 +18,17 @@ whereas an issuenum between 10001 and 20000 would be in bucket 20000.)
 '''
 
 
-async def main(dsn):
-    connector = await PGConnector.create(dsn)
-    attachments = await connector.get_file_attachments()
-    print(attachments)
+async def main(pg_dsn, sqlite_dsn):
+    pg_repo = AttachmentPGRepository(await PGConnector.create(pg_dsn))
+    sqlite_repo = AttachmentSQLiteRepository(await SQLiteConnector.create(sqlite_dsn))
+    attachments = await pg_repo.get_file_attachments()
+    await sqlite_repo.save_attachments(attachments)
+    await pg_repo.close()
+    await sqlite_repo.close()
 
 
 if __name__ == '__main__':
-    dsn = 'postgres://admin:admin@127.0.0.1:5432/db'
+    pg_dsn = 'postgres://admin:admin@127.0.0.1:5432/db'
+    sqlite_dsn = 'db.sqlite'
 
-    asyncio.run(main(dsn))
+    asyncio.run(main(pg_dsn, sqlite_dsn))
