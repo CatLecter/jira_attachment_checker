@@ -64,8 +64,8 @@ if __name__ == '__main__':
                       jira_password)
     im = LoremFlickrManager(image_download_timeout)
 
-    # main(h,
-    #      im,
-    #      project_num,
-    #      issues_per_project,
-    #      attachments_per_project)
+    main(h,
+         im,
+         project_num,
+         issues_per_project,
+         attachments_per_project)
