@@ -1,8 +1,9 @@
+import abc
 from typing import Collection
 
 import aiosqlite
 import asyncpg
-import abc
+from asyncpg import Connection, Pool
 
 
 class AbstractConnector(abc.ABC):
@@ -36,8 +37,8 @@ class PGConnector(AbstractConnector):
     async def execute_many(self, query: str, rows: Collection):
         pass
 
-    _con = None
-    _pool = None
+    _con: None | Connection = None
+    _pool: None | Pool = None
 
     @classmethod
     async def create(cls, dsn):
