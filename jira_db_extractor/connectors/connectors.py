@@ -82,8 +82,9 @@ class SQLiteConnector(AbstractConnector):
         await self._db.commit()
 
     async def fetch_all(self, query: str):
-        async with self._db.execute(query):
-            pass
+        async with self._db.execute(query) as cursor:
+            result = await cursor.fetchall()
+        return result
 
     async def fetch_one(self, query: str):
         pass

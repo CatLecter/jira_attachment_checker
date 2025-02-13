@@ -84,3 +84,14 @@ class AttachmentSQLiteRepository(AbstractRepository):
                 for a in attachments
             ],
         )
+
+    async def get_unprocessed_attachments(self) -> list[Attachment]:
+        rows = await self._connector.fetch_all(
+            """
+            select * from attachments where processed = 0;
+            """
+        )
+        result = []
+        for row in rows:
+            result.append(Attachment(*row))
+        return result
