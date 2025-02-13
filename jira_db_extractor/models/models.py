@@ -11,3 +11,6 @@ class Attachment:
     project_id: int
     path: str
     processed: bool = False
+
+    def __post_init__(self):
+        self.processed = True if self.processed else False
