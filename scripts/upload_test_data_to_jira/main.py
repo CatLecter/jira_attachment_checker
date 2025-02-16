@@ -1,12 +1,12 @@
 import argparse
 
-from jira_utils import JiraAPIHelper
+from jira_utils import JiraAPIAdapter
 from lorem_text import lorem
 from utils import AbstractImageManager, LoremFlickrManager
 
 
 def main(
-    helper: JiraAPIHelper,
+    adapter: JiraAPIAdapter,
     image_manager: AbstractImageManager,
     project_num: int,
     issues_per_project: int,
@@ -15,18 +15,18 @@ def main(
 ):
     projects = []
     for i in range(project_num):
-        projects.append(helper.create_project(f'{project_name}{i}', 'software', 'admin'))
+        projects.append(adapter.create_project(f'{project_name}{i}', 'software', 'admin'))
     issues = []
     for project in projects:
         for i in range(issues_per_project):
-            issues.append(helper.create_issue(project.key, lorem.words(2), lorem.words(5), 'Task'))
+            issues.append(adapter.create_issue(project.key, lorem.words(2), lorem.words(5), 'Task'))
     for issue in issues:
         attachments = []
         for i in range(attachments_per_issue):
             img_bytes = image_manager.get_random_image(300, 300)
-            attachments.append(helper.add_attachment(issue.id, img_bytes, f'{lorem.words(1)}.png'))
+            attachments.append(adapter.add_attachment(issue.issue_id, img_bytes, f'{lorem.words(1)}.png'))
         for attachment in attachments:
-            helper.add_comment_to_issue(issue.id, f'{lorem.sentence()} !{attachment.filename}!')
+            adapter.add_comment_to_issue(issue.issue_id, f'{lorem.sentence()} !{attachment.filename}!')
 
 
 def get_parser() -> argparse.ArgumentParser:
@@ -93,7 +93,7 @@ def get_parser() -> argparse.ArgumentParser:
 if __name__ == '__main__':
     parser = get_parser()
     args = parser.parse_args()
-    h = JiraAPIHelper(args.base_url, args.jira_admin, args.jira_password)
+    h = JiraAPIAdapter(args.base_url, args.jira_admin, args.jira_password)
     im = LoremFlickrManager(args.image_download_timeout)
 
     main(

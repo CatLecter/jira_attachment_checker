@@ -15,7 +15,7 @@ class JiraSession(Session):
         return super().request(method, joined_url, *args, **kwargs)
 
 
-class JiraAPIHelper:
+class JiraAPIAdapter:
     def __init__(self, base_url: str, login: str, password: str):
         self._session = JiraSession(base_url)
         self._session.auth = (login, password)
