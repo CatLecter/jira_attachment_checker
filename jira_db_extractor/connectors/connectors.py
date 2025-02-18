@@ -87,4 +87,6 @@ class SQLiteConnector(AbstractConnector):
         return result
 
     async def fetch_one(self, query: str):
-        pass
+        async with self._db.execute(query) as cursor:
+            result = await cursor.fetchone()
+        return result
