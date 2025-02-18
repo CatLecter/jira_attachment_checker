@@ -62,9 +62,23 @@ class SQLiteRepository(AbstractRepository):
                 processed INTEGER
             );"""
         )
+        await self._connector.execute(
+            """
+            create table if not exists launch_time (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            job_id INTEGER,
+            timestamp DATETIME);
+            """
+        )
+
+    async def save_launch_time(self):
+        await self._connector.execute('insert into launch_time(timestamp) values(CURRENT_TIMESTAMP)')
+
+    async def get_latest_launch_time(self):
+        result = await self._connector.fetch_one('select timestamp from launch_time order by id desc limit 1;')
+        return result
 
     async def save_attachments(self, attachments: list[Attachment]):
-        await self.create_table()
         await self._connector.execute_many(
             """
             insert into attachments (attachment_id,filename,file_size,file_mime_type,issue_num,project_id,path,processed)
@@ -86,11 +100,7 @@ class SQLiteRepository(AbstractRepository):
         )
 
     async def get_unprocessed_attachments(self) -> list[Attachment]:
-        rows = await self._connector.fetch_all(
-            """
-            select * from attachments where processed = 0;
-            """
-        )
+        rows = await self._connector.fetch_all('select * from attachments where processed = 0;')
         result = []
         for row in rows:
             result.append(Attachment(*row))
