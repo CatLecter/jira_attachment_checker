@@ -48,7 +48,7 @@ class AttachmentPGRepository(AbstractRepository):
         return result
 
 
-class AttachmentSQLiteRepository(AbstractRepository):
+class SQLiteRepository(AbstractRepository):
     async def create_table(self):
         await self._connector.execute(
             """create table if not exists attachments (
