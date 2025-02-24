@@ -1,14 +1,49 @@
 import asyncio
+from datetime import datetime
 from typing import AsyncGenerator
 
 import aiofiles.os
-import arq
-from arq import Worker
-from arq.connections import RedisSettings, create_pool
 
 from jira_db_extractor.connectors.connectors import SQLiteConnector
 from jira_db_extractor.connectors.repositories import SQLiteRepository
 from jira_db_extractor.models.models import Attachment
+
+
+class Worker:
+    def __init__(self, sqlite_dsn: str, path: str, working_hours: tuple[int, int] | None = None):
+        self.running = False
+        self.sqlite_dsn = sqlite_dsn
+        self.path = path
+        if working_hours:
+            self.start_at: int = working_hours[0]
+            self.end_at: int = working_hours[1]
+        self._sqlite_repo: SQLiteRepository | None = None
+        self._file_checker = None
+
+    async def check_working_hours(self):
+        try:
+            while True:
+                current_hour = datetime.now().hour
+                self.running = (
+                    self.start_at <= current_hour < self.end_at
+                )  # вызов функции, которая отменит основной цикл?
+                await asyncio.sleep(60)
+        except asyncio.CancelledError:
+            return
+
+    async def run(self):
+        await self._init_connections()
+        while self.running:
+            ...  # run
+        await self._release_connections()
+
+    async def _init_connections(self):
+        self._sqlite_repo = SQLiteRepository(await SQLiteConnector.create(self.sqlite_dsn))
+        self._file_checker = ...
+
+    async def _release_connections(self):
+        await self._sqlite_repo.close()
+        await self._file_checker.close()
 
 
 async def files_aiter(file_paths: list[str]) -> AsyncGenerator[str, None]:
@@ -31,32 +66,14 @@ async def get_unprocessed_attachments(context) -> list[Attachment]:
     return attachments
 
 
-async def on_startup(context):
-    context['sqlite_repo'] = SQLiteRepository(await SQLiteConnector.create(context.get('sqlite_dsn')))
-
-
-async def on_shutdown(context):
-    await context.get('sqlite_repo').close
-
-
-async def main(base_path: str, redis_settings: RedisSettings):
-    w = Worker(
-        redis_settings=redis_settings,
-        on_startup=on_startup,
-        on_shutdown=on_shutdown,
-    )
-    pool = w.pool
-    job = await pool.enqueue_job('get_unprocessed_attachements')
-    attachments = await job.result(timeout=5)
-    statuses = await check_files([f'{base_path}/{a.path}' for a in attachments])
-    print(statuses)
+async def main(base_path: str):
+    # attachments = []
+    # statuses = await check_files([f'{base_path}/{a.path}' for a in attachments])
+    # print(statuses)
+    ...
 
 
 if __name__ == '__main__':
-    rs = RedisSettings()
-    ctx = {
-        'sqlite_dsn': './db.sqlite',
-    }
     dir_path = '/home/tmpd/Projects/file_checker/jira/data/attachments'
 
-    asyncio.run(main(dir_path, rs))
+    asyncio.run(main(dir_path))
