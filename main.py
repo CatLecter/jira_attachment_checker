@@ -1,8 +1,5 @@
 import asyncio
 from datetime import datetime
-from typing import AsyncGenerator
-
-import aiofiles.os
 
 from db_utils.connectors.connectors import SQLiteConnector
 from db_utils.connectors.repositories import SQLiteRepository
@@ -44,19 +41,6 @@ class Worker:
     async def _release_connections(self):
         await self._sqlite_repo.close()
         await self._file_checker.close()
-
-
-async def files_aiter(file_paths: list[str]) -> AsyncGenerator[str, None]:
-    for f in file_paths:
-        yield f
-
-
-async def check_files(file_paths: list[str]) -> list[tuple[str, bool]]:
-    result = []
-    async for file_path in files_aiter(file_paths):
-        exists = await aiofiles.os.path.exists(file_path)
-        result.append((file_path, exists))
-    return result
 
 
 async def get_unprocessed_attachments(context) -> list[Attachment]:
