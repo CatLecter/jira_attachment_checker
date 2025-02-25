@@ -4,9 +4,9 @@ from typing import AsyncGenerator
 
 import aiofiles.os
 
-from jira_db_extractor.connectors.connectors import SQLiteConnector
-from jira_db_extractor.connectors.repositories import SQLiteRepository
-from jira_db_extractor.models.models import Attachment
+from db_utils.connectors.connectors import SQLiteConnector
+from db_utils.connectors.repositories import SQLiteRepository
+from db_utils.models.models import Attachment
 
 
 class Worker:

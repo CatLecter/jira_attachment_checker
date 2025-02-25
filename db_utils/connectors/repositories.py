@@ -1,8 +1,8 @@
 import abc
 import os.path
 
-from jira_db_extractor.connectors.connectors import AbstractConnector
-from jira_db_extractor.models.models import Attachment
+from db_utils.connectors.connectors import AbstractConnector
+from db_utils.models.models import Attachment
 
 
 class AbstractRepository(abc.ABC):

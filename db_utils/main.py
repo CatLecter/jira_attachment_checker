@@ -2,11 +2,11 @@ import asyncio
 
 import asyncpg
 
-from jira_db_extractor.connectors.connectors import (
+from db_utils.connectors.connectors import (
     PGConnector,
     SQLiteConnector,
 )
-from jira_db_extractor.connectors.repositories import (
+from db_utils.connectors.repositories import (
     AttachmentPGRepository,
     SQLiteRepository,
 )
