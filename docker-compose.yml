@@ -1,0 +1,61 @@
+services:
+  jira:
+    container_name: jira
+    hostname: jira
+    image: atlassian/jira-software:9.4.22
+    environment:
+      ATL_CLUSTER_NAME: "localhost"
+      JVM_MINIMUM_MEMORY: "2048m"
+      JVM_MAXIMUM_MEMORY: "4096m"
+      ATL_JDBC_URL: "jdbc:postgresql://jira-db:5432/db"
+      ATL_DB_TYPE: "postgres72"
+      ATL_DB_DRIVER: "org.postgresql.Driver"
+      ATL_DB_SCHEMA_NAME: "public"
+      ATL_JDBC_USER: "admin"
+      ATL_JDBC_PASSWORD: "admin"
+      ATL_TOMCAT_SECURE: "false"
+      ATL_TOMCAT_PROXY_NAME: "localhost"
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./jira:/var/atlassian/application-data/jira
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "500k"
+        max-file: "50"
+    depends_on:
+      jira-db:
+        condition: service_healthy
+
+  jira-db:
+    container_name: jira-db
+    hostname: jira-db
+    image: postgres:14.15
+    env_file:
+      - ./.env
+    environment:
+      POSTGRES_ENCODING: "UNICODE"
+      POSTGRES_COLLATE: "C"
+      POSTGRES_COLLATE_TYPE: "C"
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./jira-db:/var/lib/postgresql/data
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "500k"
+        max-file: "50"
+    healthcheck:
+      test: "pg_isready -d db -U admin"
+      interval: 3s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+#volumes:
+#  jira:
+#    external: false
+#  jira-db:
+#    external: false

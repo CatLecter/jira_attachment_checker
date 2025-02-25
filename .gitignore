@@ -171,4 +171,10 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
 .idea
+jira
+jira-db
+
+
+*.sqlite
