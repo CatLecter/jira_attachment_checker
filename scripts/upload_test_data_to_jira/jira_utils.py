@@ -1,10 +1,9 @@
 import json
 
+from exceptions import ProjectException
 from lorem_text import lorem
 from models import Attachment, Comment, Issue, Project, ProjectType
 from requests import Response, Session
-
-from scripts.upload_test_data_to_jira.exceptions import ProjectException
 
 
 class JiraSession(Session):
