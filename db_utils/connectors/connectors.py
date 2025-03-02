@@ -75,11 +75,13 @@ class SQLiteConnector(AbstractConnector):
 
     async def execute(self, query: str):
         cur = await self._db.execute(query)
+        await self._db.commit()
         await cur.close()
 
     async def execute_many(self, query: str, rows: Collection):
-        await self._db.executemany(query, rows)
+        cur = await self._db.executemany(query, rows)
         await self._db.commit()
+        await cur.close()
 
     async def fetch_all(self, query: str):
         async with self._db.execute(query) as cursor:
