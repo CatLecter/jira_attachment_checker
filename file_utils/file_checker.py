@@ -1,16 +1,8 @@
 from typing import AsyncGenerator
 
-import aiofiles.os
+from db_utils.models.models import Attachment
 
 
-async def files_aiter(file_paths: list[str]) -> AsyncGenerator[str, None]:
-    for f in file_paths:
-        yield f
-
-
-async def check_files(file_paths: list[str]) -> list[tuple[str, bool]]:
-    result = []
-    async for file_path in files_aiter(file_paths):
-        exists = await aiofiles.os.path.exists(file_path)
-        result.append((file_path, exists))
-    return result
+async def attachments_aiter(attachments: list[Attachment]) -> AsyncGenerator[Attachment, None]:
+    for a in attachments:
+        yield a
