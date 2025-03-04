@@ -31,11 +31,14 @@ class Worker:
             while True:
                 current_hour = datetime.now().hour
                 self.running = (
-                    self.start_at <= current_hour < self.end_at
+                    self.start_at <= current_hour < self.end_at  # todo инвертировать
                 )  # вызов функции, которая отменит основной цикл?
                 await asyncio.sleep(60)
         except asyncio.CancelledError:
             return
+
+    async def main_loop(self):
+        raise NotImplementedError
 
     async def run(self):
         await self._init_connections()
