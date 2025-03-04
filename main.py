@@ -1,4 +1,5 @@
 import asyncio
+import sqlite3
 from datetime import datetime
 
 import aiofiles.os
@@ -24,7 +25,12 @@ class Worker:
             self.start_at: int = working_hours[0]
             self.end_at: int = working_hours[1]
         self._sqlite_repo: SQLiteRepository | None = None
+        self._pg_repo: AttachmentPGRepository | None
         self._file_checker = None
+
+    async def get_attachments_from_jira_db(self):
+        attachments = await self._pg_repo.get_file_attachments()
+        await self._sqlite_repo.save_attachments(attachments)
 
     async def check_working_hours(self):
         try:
@@ -42,6 +48,7 @@ class Worker:
 
     async def run(self):
         await self._init_connections()
+        await self.get_attachments_from_jira_db()
         while self.running:
             # get last time when tasks was gathered from jira
             seconds_since_tasks_gathered = await self._sqlite_repo.seconds_from_last_launch()
@@ -64,6 +71,7 @@ class Worker:
                 async for a in attachments_aiter(attachments):
                     #   check if attachment has any problems in filesystem
                     exists = await aiofiles.os.path.exists(a.path)
+                    print('huh?')
                     await self._sqlite_repo.save_attachment_report(a, exists)
 
                     #   if attachment has problems:
@@ -81,7 +89,7 @@ class Worker:
 
     async def _release_connections(self):
         await self._sqlite_repo.close()
-        await self._file_checker.close()
+        # await self._file_checker.close()
 
 
 async def get_unprocessed_attachments(context) -> list[Attachment]:
@@ -91,14 +99,42 @@ async def get_unprocessed_attachments(context) -> list[Attachment]:
     return attachments
 
 
+def init_db(sqlite_dsn: str):
+    con = sqlite3.connect(sqlite_dsn)
+    with con:
+        # todo tables for attachment_reports
+        con.execute(
+            """create table if not exists attachments (
+                attachment_id INTEGER PRIMARY KEY,
+                filename text NOT NULL,
+                file_size INTEGER,
+                file_mime_type text,
+                issue_num INTEGER,
+                project_id INTEGER,
+                path text,
+                processed INTEGER
+            );"""
+        )
+        con.execute(
+            """
+            create table if not exists launch_time (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            job_id INTEGER,
+            timestamp DATETIME);
+            """
+        )
+
+
 async def main(base_path: str):
-    # attachments = []
-    # statuses = await check_files([f'{base_path}/{a.path}' for a in attachments])
-    # print(statuses)
-    raise NotImplementedError
+    w = Worker(
+        'sqlite.db', 'postgres://admin:admin@127.0.0.1:5432/db', '/home/tmpd/Projects/jira_attachment_checker/jira'
+    )
+    w.running = True
+    await w.run()
 
 
 if __name__ == '__main__':
+    init_db('sqlite.db')
     dir_path = '/home/tmpd/Projects/file_checker/jira/data/attachments'
 
     asyncio.run(main(dir_path))

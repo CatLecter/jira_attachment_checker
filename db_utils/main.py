@@ -22,23 +22,3 @@ Since the issuenum is 11, it will be in the "10000" bucket.
 (An issuenum between 1 and 10000 would be bucket 10000,
 whereas an issuenum between 10001 and 20000 would be in bucket 20000.)
 """
-
-
-async def main(pg_dsn, sqlite_dsn):
-    pg_repo = AttachmentPGRepository(await PGConnector.create(pg_dsn))
-    sqlite_repo = SQLiteRepository(await SQLiteConnector.create(sqlite_dsn))
-    await sqlite_repo.init_tables()
-    await sqlite_repo.save_launch_time()
-    attachments = await pg_repo.get_file_attachments()
-    await sqlite_repo.save_attachments(attachments)
-    launch_time = await sqlite_repo.get_latest_launch_time()
-    print(launch_time)
-    await pg_repo.close()
-    await sqlite_repo.close()
-
-
-if __name__ == '__main__':
-    pg_dsn = 'postgres://admin:admin@127.0.0.1:5432/db'
-    sqlite_dsn = 'db.sqlite'
-
-    asyncio.run(main(pg_dsn, sqlite_dsn))

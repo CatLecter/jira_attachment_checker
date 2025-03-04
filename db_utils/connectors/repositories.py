@@ -53,33 +53,12 @@ class AttachmentPGRepository(AbstractRepository):
 
 
 class SQLiteRepository(AbstractRepository):
-    async def create_tables(self):
-        # todo tables for attachment_reports
-        await self._connector.execute(
-            """create table if not exists attachments (
-                attachment_id INTEGER PRIMARY KEY,
-                filename text NOT NULL,
-                file_size INTEGER,
-                file_mime_type text,
-                issue_num INTEGER,
-                project_id INTEGER,
-                path text,
-                processed INTEGER
-            );"""
-        )
-        await self._connector.execute(
-            """
-            create table if not exists launch_time (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            job_id INTEGER,
-            timestamp DATETIME);
-            """
-        )
-
     async def save_launch_time(self):
         await self._connector.execute("insert into launch_time(timestamp) values(datetime('now','localtime'))")
 
     async def save_attachment_report(self, attachment: Attachment, exists: bool):
+        print(attachment)
+        print('saving attachment report')
         # mark attachment as processed in table
         ...  # todo save_attachment_report
 
@@ -97,7 +76,7 @@ class SQLiteRepository(AbstractRepository):
     async def save_attachments(self, attachments: list[Attachment]):
         await self._connector.execute_many(
             """
-            insert into attachments (attachment_id,filename,file_size,file_mime_type,issue_num,project_id,path,processed)
+            insert or ignore into attachments (attachment_id,filename,file_size,file_mime_type,issue_num,project_id,path,processed)
             values (?,?,?,?,?,?,?,?);
             """,
             [
@@ -119,8 +98,8 @@ class SQLiteRepository(AbstractRepository):
     async def get_unprocessed_attachments(
         self, limit: int | None = None, offset: int | None = None
     ) -> list[Attachment]:
-        limit_str = f' limit={limit}' if limit else ''
-        offset_str = f' offset={offset}' if offset else ''
+        limit_str = f' limit {limit}' if limit else ''
+        offset_str = f' offset {offset}' if offset else ''
         rows = await self._connector.fetch_all(f'select * from attachments where processed = 0{limit_str}{offset_str};')
         result = []
         for row in rows:
@@ -130,8 +109,6 @@ class SQLiteRepository(AbstractRepository):
 
 async def test():
     repo = SQLiteRepository(await SQLiteConnector.create('test.db'))
-    # await repo.create_table()
-    # await repo.save_launch_time()
     time_elapsed = await repo.seconds_from_last_launch()
     print(time_elapsed)
 
