@@ -9,6 +9,7 @@ class Attachment:
     file_mime_type: str
     issue_num: int
     project_id: int
+    project_name: str
     path: str
     processed: bool = False
 

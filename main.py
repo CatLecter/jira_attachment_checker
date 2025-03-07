@@ -14,6 +14,9 @@ from file_utils.file_checker import attachments_aiter
 FETCH_TASKS_PERIOD = 600
 PG_BATCH_SIZE = 1000
 FILE_BATCH_SIZE = 100
+SQLITE_DSN = 'db.sqlite'
+PG_DSN = 'postgres://admin:admin@127.0.0.1:5432/db'
+FILES_PATH = '/home/tmpd/Projects/jira_attachment_checker/jira/data/attachments'
 
 
 class Worker:
@@ -70,7 +73,7 @@ class Worker:
                 attachments_batch = []
                 async for a in attachments_aiter(attachments):
                     path = os.path.join('/home/tmpd/Projects/jira_attachment_checker/jira/data/attachments', a.path)
-                    exists = await aiofiles.os.path.exists(path)   # todo extract method
+                    exists = await aiofiles.os.path.exists(path)  # todo extract method
                     if exists:
                         size = await aiofiles.os.path.getsize(path)
                         if size != a.file_size:
@@ -118,6 +121,7 @@ def init_db(sqlite_dsn: str):
                 file_mime_type text,
                 issue_num INTEGER,
                 project_id INTEGER,
+                project_name text,
                 path text,
                 processed INTEGER
             );
@@ -152,16 +156,13 @@ def init_db(sqlite_dsn: str):
         )
 
 
-async def main(base_path: str):
-    w = Worker(
-        'db.sqlite', 'postgres://admin:admin@127.0.0.1:5432/db', '/home/tmpd/Projects/jira_attachment_checker/jira'
-    )
+async def main():
+    w = Worker(SQLITE_DSN, PG_DSN, FILES_PATH)
     w.running = True
     await w.run()
 
 
 if __name__ == '__main__':
     init_db('db.sqlite')
-    dir_path = '/home/tmpd/Projects/file_checker/jira/data/attachments'
 
-    asyncio.run(main(dir_path))
+    asyncio.run(main())

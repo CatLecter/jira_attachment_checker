@@ -22,7 +22,7 @@ class AttachmentPGRepository(AbstractRepository):
         attachments = await self._connector.fetch_all(
             f"""
             select fa.id as attachment_id, fa.filename, fa.filesize, fa.mimetype, ji.issuenum, p.id as project_id,
-            p.pkey as project_key from fileattachment fa join jiraissue ji on ji.id = fa.issueid
+            p.pkey as project_key,p.pname as project_name from fileattachment fa join jiraissue ji on ji.id = fa.issueid
             join project p on p.id = ji.project{limit_str}{offset_str};
             """
         )
@@ -31,6 +31,7 @@ class AttachmentPGRepository(AbstractRepository):
             issue_num = int(a.get('issuenum'))
             bucket = str((((issue_num - 1) // 10000) + 1) * 10000)
             project_key = str(a.get('project_key'))
+            project_name = str(a.get('project_name'))
             issue_key = f'{project_key}-{issue_num}'
             attachment_id = int(a.get('attachment_id'))
             path = os.path.join(project_key, bucket, issue_key, str(attachment_id))
@@ -46,6 +47,7 @@ class AttachmentPGRepository(AbstractRepository):
                     file_mime_type,
                     issue_num,
                     project_id,
+                    project_name,
                     path,
                 )
             )
@@ -63,7 +65,7 @@ class SQLiteRepository(AbstractRepository):
     async def save_attachment_reports(self, attachments: list[tuple[Attachment, str, str]]):
         values = []
         for a, path, status in attachments:
-            values.append([a.id, a.filename, path, status, a.project_id])
+            values.append([a.id, a.filename, path, status, a.project_name])
             await self._connector.execute_many(
                 f"""
                         insert or ignore into reports(
@@ -97,8 +99,19 @@ class SQLiteRepository(AbstractRepository):
     async def save_attachments(self, attachments: list[Attachment]):
         await self._connector.execute_many(
             """
-            insert or ignore into attachments (attachment_id,filename,file_size,file_mime_type,issue_num,project_id,path,processed)
-            values (?,?,?,?,?,?,?,?);
+            insert or ignore into attachments (
+                attachment_id,
+                filename,
+                file_size,
+                file_mime_type,
+                issue_num,
+                project_id,
+                project_name,
+                path,
+                processed)
+            values (
+                ?,?,?,?,?,?,?,?,?
+            );
             """,
             [
                 (
@@ -108,6 +121,7 @@ class SQLiteRepository(AbstractRepository):
                     a.file_mime_type,
                     a.issue_num,
                     a.project_id,
+                    a.project_name,
                     a.path,
                     False,
                 )
