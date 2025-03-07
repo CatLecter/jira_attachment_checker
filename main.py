@@ -85,6 +85,11 @@ class Worker:
                     attachments_batch.append((a, path, status))
                 await self._sqlite_repo.update_attachments([a[0] for a in attachments_batch])
                 await self._sqlite_repo.save_attachment_reports(attachments_batch)
+                # todo логи!!!!
+                # todo название issue для отчета
+                # todo проверка прав файла
+                # todo формирование отчета (краткий, полный)
+                # todo отчет в телегу
 
         await self._release_connections()
 
