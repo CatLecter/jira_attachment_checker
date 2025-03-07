@@ -56,11 +56,32 @@ class SQLiteRepository(AbstractRepository):
     async def save_launch_time(self):
         await self._connector.execute("insert into launch_time(timestamp) values(datetime('now','localtime'))")
 
-    async def save_attachment_report(self, attachment: Attachment, exists: bool):
-        print(attachment)
-        print('saving attachment report')
-        # mark attachment as processed in table
-        ...  # todo save_attachment_report
+    async def update_attachments(self, attachments: list[Attachment]):
+        values = [(str(a.id),) for a in attachments]
+        await self._connector.execute_many(f'update attachments set processed = 1 where attachment_id = ?', values)
+
+    async def save_attachment_reports(self, attachments: list[tuple[Attachment, str, str]]):
+        values = []
+        for a, path, status in attachments:
+            values.append([a.id, a.filename, path, status, a.project_id])
+            await self._connector.execute_many(
+                f"""
+                        insert or ignore into reports(
+                            attachment_id,
+                            filename,
+                            full_path,
+                            status,
+                            project_name
+                        ) values (
+                            ?,
+                            ?,
+                            ?,
+                            ?,
+                            ?
+                        );
+                    """,
+                values,
+            )
 
     async def seconds_from_last_launch(self) -> int:
         records = await self._connector.fetch_one('select timestamp from launch_time order by id desc limit 1;')

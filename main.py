@@ -1,4 +1,5 @@
 import asyncio
+import os
 import sqlite3
 from datetime import datetime
 
@@ -50,11 +51,8 @@ class Worker:
         await self._init_connections()
         await self.get_attachments_from_jira_db()
         while self.running:
-            # get last time when tasks was gathered from jira
             seconds_since_tasks_gathered = await self._sqlite_repo.seconds_from_last_launch()
-            # if elapsed time since then is more than parameter:
             if seconds_since_tasks_gathered > FETCH_TASKS_PERIOD:
-                # gather tasks from jira again
                 offset = 0
                 while True:
                     attachments = await self._pg_repo.get_file_attachments(limit=PG_BATCH_SIZE, offset=offset)
@@ -65,18 +63,26 @@ class Worker:
 
             offset = 0
             while True:
-                # get batch of attachments from sqlite repo
                 attachments = await self._sqlite_repo.get_unprocessed_attachments(limit=FILE_BATCH_SIZE, offset=offset)
-                # for each attachment in batch:
+                if not attachments:
+                    print('done')
+                    break
+                attachments_batch = []
                 async for a in attachments_aiter(attachments):
-                    #   check if attachment has any problems in filesystem
-                    exists = await aiofiles.os.path.exists(a.path)
-                    print('huh?')
-                    await self._sqlite_repo.save_attachment_report(a, exists)
+                    path = os.path.join('/home/tmpd/Projects/jira_attachment_checker/jira/data/attachments', a.path)
+                    exists = await aiofiles.os.path.exists(path)   # todo extract method
+                    if exists:
+                        size = await aiofiles.os.path.getsize(path)
+                        if size != a.file_size:
+                            status = 'wrong_size'
+                        else:
+                            status = 'ok'
+                    else:
+                        status = 'missing'
+                    attachments_batch.append((a, path, status))
+                await self._sqlite_repo.update_attachments([a[0] for a in attachments_batch])
+                await self._sqlite_repo.save_attachment_reports(attachments_batch)
 
-                    #   if attachment has problems:
-                    #       write down to sqlite repo that attachment and reason
-                    #   mark attachment as processed in sqlite repo
         await self._release_connections()
 
     async def create_report(self):
@@ -104,7 +110,8 @@ def init_db(sqlite_dsn: str):
     with con:
         # todo tables for attachment_reports
         con.execute(
-            """create table if not exists attachments (
+            """
+            create table if not exists attachments (
                 attachment_id INTEGER PRIMARY KEY,
                 filename text NOT NULL,
                 file_size INTEGER,
@@ -113,28 +120,48 @@ def init_db(sqlite_dsn: str):
                 project_id INTEGER,
                 path text,
                 processed INTEGER
-            );"""
+            );
+            """
         )
         con.execute(
             """
             create table if not exists launch_time (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            job_id INTEGER,
-            timestamp DATETIME);
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                job_id INTEGER,
+                timestamp DATETIME
+            );
+            """
+        )
+        con.execute(
+            """
+            create table if not exists parameters (
+                name text unique,
+                value text);
+            """
+        )
+        con.execute(
+            """
+            create table if not exists reports(
+                attachment_id integer primary key,
+                filename text,
+                full_path text,
+                status text,
+                project_name text
+            )
             """
         )
 
 
 async def main(base_path: str):
     w = Worker(
-        'sqlite.db', 'postgres://admin:admin@127.0.0.1:5432/db', '/home/tmpd/Projects/jira_attachment_checker/jira'
+        'db.sqlite', 'postgres://admin:admin@127.0.0.1:5432/db', '/home/tmpd/Projects/jira_attachment_checker/jira'
     )
     w.running = True
     await w.run()
 
 
 if __name__ == '__main__':
-    init_db('sqlite.db')
+    init_db('db.sqlite')
     dir_path = '/home/tmpd/Projects/file_checker/jira/data/attachments'
 
     asyncio.run(main(dir_path))
