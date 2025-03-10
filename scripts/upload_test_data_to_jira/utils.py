@@ -24,6 +24,6 @@ class LoremFlickrManager(AbstractImageManager):
         r = self.session.get(f'https://loremflickr.com/json/{width}/{height}')
         self.last_run = time.time()
         d = json.loads(r.text)
-        img_url = d['rawFileUrl']
+        img_url = d['file']
         img_r = self.session.get(img_url)
         return img_r.content
