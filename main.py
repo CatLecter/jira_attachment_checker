@@ -39,83 +39,105 @@ class Worker:
         attachments = await self._pg_repo.get_file_attachments()
         await self._sqlite_repo.save_attachments(attachments)
 
-    async def check_working_hours(self):
+    async def check_working_hours(self, event: asyncio.Event):
         try:
-            while True:
+            while not event.is_set():
                 logger.debug('Проверка запрета на работу (рабочие часы)')
                 current_hour = datetime.now().hour
-                self.running = (
-                    self.start_at <= current_hour < self.end_at  # todo инвертировать
+                self.running = not (
+                        self.start_at <= current_hour < self.end_at
                 )  # вызов функции, которая отменит основной цикл?
-                logger.debug(f'self.running={self.running}')
+                logger.debug('Работа разрешена' if self.running else 'работа запрещена')
                 await asyncio.sleep(60)
+            logger.debug("Завершение функции запрета на работу")
         except asyncio.CancelledError:
             logger.info('функция проверки запрета на работу отменена')
             return
 
-    async def main_loop(self):
-        raise NotImplementedError
-
     async def run(self):
+        event = asyncio.Event()
+        tasks = (
+            asyncio.create_task(self.check_working_hours(event)),
+            asyncio.create_task(self.check_attachments(event))
+        )
+        try:
+            await asyncio.gather(*tasks)
+        except Exception as e:
+            logger.error(f'Исключение {e}, отмена задач')
+            for t in tasks:
+                t.cancel()
+    async def check_attachments(self, event: asyncio.Event):
         logger.info('Запуск функции проверки вложений')
         await self._init_connections()
-        while self.running:
-            logger.debug('Итерация')
-            logger.debug('Проверка времени последнего запуска получения вложений из базы postgres')
-            seconds_since_tasks_gathered = (
-                await self._sqlite_repo.seconds_from_last_launch()
-            )  # todo заменить таблицу на параметр
-            if seconds_since_tasks_gathered > FETCH_TASKS_PERIOD:
-                logger.info(
-                    f'Запуск получения вложений из базы postgres'
-                    f' и запись их в базу sqlite батчами по {PG_BATCH_SIZE}'
-                )
-                offset = 0
-                while True:
-                    attachments = await self._pg_repo.get_file_attachments(limit=PG_BATCH_SIZE, offset=offset)
-                    if not attachments:
-                        logger.info('Завершено')
-                        break
-                    await self._sqlite_repo.save_attachments(attachments)
-                    offset += PG_BATCH_SIZE
-            offset = 0
-            logger.info('Запуск основного цикла проверки вложений на диске')
-            while True:
-                logger.debug(f'Итерация. Размер батча {FILE_BATCH_SIZE}, отступ {offset}')
-                logger.debug(f'Получение {FILE_BATCH_SIZE} вложений из sqlite с отступом {offset}')
-                attachments = await self._sqlite_repo.get_unprocessed_attachments(limit=FILE_BATCH_SIZE, offset=offset)
-                if not attachments:
-                    logger.info('В базе отсутствуют необработанные вложения, работа цикла завершена')
-                    self.running = False
-                    break
-                attachments_batch = []
-                logger.debug('Проверка на диске батча вложений')
-                async for a in attachments_aiter(attachments):
-                    path = os.path.join('/home/tmpd/Projects/jira_attachment_checker/jira/data/attachments', a.path)
-                    exists = await aiofiles.os.path.exists(path)  # todo extract method
-                    if exists:
-                        size = await aiofiles.os.path.getsize(path)
-                        if size != a.file_size:
-                            status = 'wrong_size'
-                        else:
-                            status = 'ok'
-                    else:
-                        status = 'missing'
-                    logger.debug(f'Вложение {path} проверено, статус {status}')
-                    attachments_batch.append((a, path, status))
+        has_unprocessed_attachments = True
+        try:
+            while has_unprocessed_attachments:
+                if self.running:
+                    logger.debug('Итерация')
+                    logger.debug('Проверка времени последнего запуска получения вложений из базы postgres')
+                    seconds_since_tasks_gathered = (
+                        await self._sqlite_repo.seconds_from_last_launch()
+                    )  # todo заменить таблицу на параметр
+                    if seconds_since_tasks_gathered > FETCH_TASKS_PERIOD:
+                        logger.info(
+                            f'Запуск получения вложений из базы postgres'
+                            f' и запись их в базу sqlite батчами по {PG_BATCH_SIZE}'
+                        )
+                        offset = 0
+                        while True:
+                            attachments = await self._pg_repo.get_file_attachments(limit=PG_BATCH_SIZE, offset=offset)
+                            if not attachments:
+                                logger.info('Завершено')
+                                break
+                            await self._sqlite_repo.save_attachments(attachments)
+                            offset += PG_BATCH_SIZE
+                    offset = 0
+                    logger.info('Запуск основного цикла проверки вложений на диске')
+                    while True:
+                        logger.debug(f'Итерация. Размер батча {FILE_BATCH_SIZE}, отступ {offset}')
+                        logger.debug(f'Получение {FILE_BATCH_SIZE} вложений из sqlite с отступом {offset}')
+                        attachments = await self._sqlite_repo.get_unprocessed_attachments(limit=FILE_BATCH_SIZE,
+                                                                                          offset=offset)
+                        if not attachments:
+                            logger.info('В базе отсутствуют необработанные вложения, работа цикла завершена')
+                            has_unprocessed_attachments = False
+                            event.set()
+                            break
+                        attachments_batch = []
+                        logger.debug('Проверка на диске батча вложений')
+                        async for a in attachments_aiter(attachments):
+                            path = os.path.join('/home/tmpd/Projects/jira_attachment_checker/jira/data/attachments',
+                                                a.path)
+                            exists = await aiofiles.os.path.exists(path)  # todo extract method
+                            if exists:
+                                size = await aiofiles.os.path.getsize(path)
+                                if size != a.file_size:
+                                    status = 'wrong_size'
+                                else:
+                                    status = 'ok'
+                            else:
+                                status = 'missing'
+                            logger.debug(f'Вложение {path} проверено, статус {status}')
+                            attachments_batch.append((a, path, status))
 
-                logger.debug('Отметка батча вложений обработанными')
-                await self._sqlite_repo.update_attachments([a[0] for a in attachments_batch])
-                logger.debug('Запись информации о батче вложений в таблицу reports sqlite')
-                await self._sqlite_repo.save_attachment_reports(attachments_batch)
-                logger.debug('Конец итерации')
+                        logger.debug('Отметка батча вложений обработанными')
+                        await self._sqlite_repo.update_attachments([a[0] for a in attachments_batch])
+                        logger.debug('Запись информации о батче вложений в таблицу reports sqlite')
+                        await self._sqlite_repo.save_attachment_reports(attachments_batch)
+                        logger.debug('Конец итерации')
+                else:
+                    logger.info("Запрет на работу (рабочие часы)")
+                    await asyncio.sleep(60)
             logger.info('Цикл завершен')
             # todo название issue для отчета
             # todo проверка прав файла
             # todo формирование отчета (краткий, полный)
             # todo отчет в телегу
-
-        await self._release_connections()
+        except Exception as e:
+            logger.error(f"Исключение {e}")
+            return
+        finally:
+            await self._release_connections()
 
     async def create_report(self):
         raise NotImplementedError
@@ -128,6 +150,7 @@ class Worker:
     async def _release_connections(self):
         logger.info('Закрытие соединений')
         await self._sqlite_repo.close()
+        await self._pg_repo.close()
 
 
 def init_db(sqlite_dsn: str):
@@ -174,7 +197,7 @@ def init_db(sqlite_dsn: str):
 
 
 async def main():
-    w = Worker(SQLITE_DSN, PG_DSN, FILES_PATH)
+    w = Worker(SQLITE_DSN, PG_DSN, FILES_PATH, (9, 18))
     w.running = True
     await w.run()
 
