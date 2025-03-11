@@ -17,8 +17,8 @@ class AbstractRepository(abc.ABC):
 
 class AttachmentPGRepository(AbstractRepository):
     async def get_file_attachments(self, offset: int = None, limit: int = None):
-        limit_str = f' limit={limit}' if limit else ''
-        offset_str = f' offset={offset}' if offset else ''
+        limit_str = f' limit {limit}' if limit else ''
+        offset_str = f' offset {offset}' if offset else ''
         attachments = await self._connector.fetch_all(
             f"""
             select fa.id as attachment_id, fa.filename, fa.filesize, fa.mimetype, ji.issuenum, p.id as project_id,
@@ -55,8 +55,11 @@ class AttachmentPGRepository(AbstractRepository):
 
 
 class SQLiteRepository(AbstractRepository):
+    time_format = '%Y-%m-%d %H:%M:%S'
+
     async def save_launch_time(self):
-        await self._connector.execute("insert into launch_time(timestamp) values(datetime('now','localtime'))")
+        launch_time = datetime.datetime.now().strftime(self.time_format)
+        await self._connector.execute(f"update parameters set value = '{launch_time}' where name = 'launch_time';")
 
     async def update_attachments(self, attachments: list[Attachment]):
         values = [(str(a.id),) for a in attachments]
@@ -86,15 +89,15 @@ class SQLiteRepository(AbstractRepository):
             )
 
     async def seconds_from_last_launch(self) -> int:
-        records = await self._connector.fetch_one('select timestamp from launch_time order by id desc limit 1;')
+        records = await self._connector.fetch_one('select value from parameters where name="launch_time";')
         if records:
 
-            last_launch_time = datetime.datetime.strptime(records[0], '%Y-%m-%d %H:%M:%S')
+            last_launch_time = datetime.datetime.strptime(records[0], self.time_format)
             time_since_last_launch = datetime.datetime.now() - last_launch_time
 
             return time_since_last_launch.seconds
         else:
-            return 0
+            return -1
 
     async def save_attachments(self, attachments: list[Attachment]):
         await self._connector.execute_many(
