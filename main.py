@@ -9,14 +9,7 @@ from loguru import logger
 from db_utils.connectors.connectors import PGConnector, SQLiteConnector
 from db_utils.connectors.repositories import AttachmentPGRepository, SQLiteRepository
 from file_utils.file_checker import attachments_aiter, check_file_status
-
-# parameters todo:move to settings
-FETCH_TASKS_PERIOD = 600
-PG_BATCH_SIZE = 1000
-FILE_BATCH_SIZE = 100
-SQLITE_DSN = 'db.sqlite'
-PG_DSN = 'postgres://admin:admin@127.0.0.1:5432/db'
-FILES_PATH = '/home/tmpd/Projects/jira_attachment_checker/jira/data/attachments'
+from settings import settings
 
 
 class Worker:
@@ -78,26 +71,28 @@ class Worker:
                     logger.debug('Итерация')
                     logger.debug('Проверка времени последнего запуска получения вложений из базы postgres')
                     seconds_since_tasks_gathered = await self._sqlite_repo.seconds_from_last_launch()
-                    if seconds_since_tasks_gathered < 0 or seconds_since_tasks_gathered > FETCH_TASKS_PERIOD:
+                    if seconds_since_tasks_gathered < 0 or seconds_since_tasks_gathered > settings.fetch_tasks_period:
                         logger.info(
                             f'Запуск получения вложений из базы postgres'
-                            f' и запись их в базу sqlite батчами по {PG_BATCH_SIZE}'
+                            f' и запись их в базу sqlite батчами по {settings.pg_batch_size}'
                         )
                         offset = 0
                         while True:
-                            attachments = await self._pg_repo.get_file_attachments(limit=PG_BATCH_SIZE, offset=offset)
+                            attachments = await self._pg_repo.get_file_attachments(
+                                limit=settings.pg_batch_size, offset=offset
+                            )
                             if not attachments:
                                 logger.info('Завершено')
                                 break
                             await self._sqlite_repo.save_attachments(attachments)
-                            offset += PG_BATCH_SIZE
+                            offset += settings.pg_batch_size
                     offset = 0
                     logger.info('Запуск основного цикла проверки вложений на диске')
                     while True:
-                        logger.debug(f'Итерация. Размер батча {FILE_BATCH_SIZE}, отступ {offset}')
-                        logger.debug(f'Получение {FILE_BATCH_SIZE} вложений из sqlite с отступом {offset}')
+                        logger.debug(f'Итерация. Размер батча {settings.file_batch_size}, отступ {offset}')
+                        logger.debug(f'Получение {settings.file_batch_size} вложений из sqlite с отступом {offset}')
                         attachments = await self._sqlite_repo.get_unprocessed_attachments(
-                            limit=FILE_BATCH_SIZE, offset=offset
+                            limit=settings.file_batch_size, offset=offset
                         )
                         if not attachments:
                             logger.info('В базе отсутствуют необработанные вложения, работа цикла завершена')
@@ -193,13 +188,13 @@ def init_db(sqlite_dsn: str):
 
 
 async def main():
-    w = Worker(SQLITE_DSN, PG_DSN, FILES_PATH, (9, 18))
+    w = Worker(settings.sqlite_dsn, settings.pg_dsn, settings.files_path, (9, 18))
     w.running = True
     await w.run()
 
 
 if __name__ == '__main__':
     logger.info('Начало работы')
-    init_db('db.sqlite')
+    init_db(settings.sqlite_dsn)
     logger.debug('Запуск главной функции')
     asyncio.run(main())
