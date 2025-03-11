@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     uid: int
     gid: int
     file_mode: str
+    start_at: int
+    stop_at: int
 
 
 settings = Settings(_env_file='.env', _env_file_encoding='utf-8')

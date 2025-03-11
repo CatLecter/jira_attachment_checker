@@ -13,15 +13,14 @@ from settings import settings
 
 
 class Worker:
-    def __init__(self, sqlite_dsn: str, pg_dns: str, path: str, working_hours: tuple[int, int] | None = None):
+    def __init__(self, sqlite_dsn: str, pg_dns: str, path: str, stop_at: int, start_at: int):
         logger.debug('Создание экземпляра класса Worker')
         self.running = False
         self.sqlite_dsn = sqlite_dsn
         self.pg_dsn = pg_dns
         self.path = path
-        if working_hours:
-            self.start_at: int = working_hours[0]
-            self.end_at: int = working_hours[1]
+        self.start_at: int = start_at
+        self.stop_at: int = stop_at
         self._sqlite_repo: SQLiteRepository | None = None
         self._pg_repo: AttachmentPGRepository | None
         self._file_checker = None
@@ -37,7 +36,7 @@ class Worker:
                 logger.debug('Проверка запрета на работу (рабочие часы)')
                 current_hour = datetime.now().hour
                 self.running = not (
-                    self.start_at <= current_hour < self.end_at
+                    self.stop_at <= current_hour < self.start_at
                 )  # вызов функции, которая отменит основной цикл?
                 logger.debug('Работа разрешена' if self.running else 'работа запрещена')
                 await asyncio.sleep(60)
@@ -188,7 +187,9 @@ def init_db(sqlite_dsn: str):
 
 
 async def main():
-    w = Worker(settings.sqlite_dsn, settings.postgres_dsn, settings.jira_files_path, (9, 18))
+    w = Worker(
+        settings.sqlite_dsn, settings.postgres_dsn, settings.jira_files_path, settings.stop_at, settings.start_at
+    )
     w.running = True
     await w.run()
 
