@@ -4,6 +4,7 @@ from typing import Collection
 import aiosqlite
 import asyncpg
 from asyncpg import Connection, Pool
+from pydantic import PostgresDsn
 
 
 class AbstractConnector(abc.ABC):
@@ -43,6 +44,8 @@ class PGConnector(AbstractConnector):
     @classmethod
     async def create(cls, dsn):
         self = cls()
+        if isinstance(dsn, PostgresDsn):
+            dsn = str(dsn)
         self._pool = await asyncpg.create_pool(dsn)
         self._con = await self._pool.acquire()
         return self

@@ -8,7 +8,7 @@ from loguru import logger
 
 from db_utils.connectors.connectors import PGConnector, SQLiteConnector
 from db_utils.connectors.repositories import AttachmentPGRepository, SQLiteRepository
-from file_utils.file_checker import attachments_aiter, check_file_status
+from file_utils.file_utils import attachments_aiter, check_file_status
 from settings import settings
 
 
@@ -56,6 +56,7 @@ class Worker:
             await asyncio.gather(*tasks)
         except Exception as e:
             logger.error(f'Исключение {e}, отмена задач')
+            logger.error(traceback.format_exc())
             for t in tasks:
                 t.cancel()
         finally:
@@ -105,7 +106,7 @@ class Worker:
                             path = os.path.join(
                                 '/home/tmpd/Projects/jira_attachment_checker/jira/data/attachments', a.path
                             )
-                            status = await check_file_status(a, path)
+                            status = await check_file_status(a, path, settings.uid, settings.gid, settings.file_mode)
                             logger.debug(f'Вложение {path} проверено, статус {status}')
                             attachments_batch.append((a, path, status))
 
@@ -119,7 +120,6 @@ class Worker:
                     await asyncio.sleep(60)
             logger.info('Цикл завершен, установка события завершения')
             event.set()
-            # todo проверка прав файла
             # todo формирование отчета (краткий, полный)
             # todo отчет в телегу
         except Exception as e:
@@ -188,7 +188,7 @@ def init_db(sqlite_dsn: str):
 
 
 async def main():
-    w = Worker(settings.sqlite_dsn, settings.pg_dsn, settings.files_path, (9, 18))
+    w = Worker(settings.sqlite_dsn, settings.postgres_dsn, settings.jira_files_path, (9, 18))
     w.running = True
     await w.run()
 

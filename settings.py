@@ -9,7 +9,9 @@ class Settings(BaseSettings):
     sqlite_dsn: str
     postgres_dsn: PostgresDsn
     jira_files_path: str
+    uid: int
+    gid: int
+    file_mode: str
 
 
 settings = Settings(_env_file='.env', _env_file_encoding='utf-8')
-print(settings)
