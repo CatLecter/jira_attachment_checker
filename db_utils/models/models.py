@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass
@@ -8,6 +8,7 @@ class Attachment:
     file_size: int
     file_mime_type: str
     issue_num: int
+    issue_name: str = field(init=False)
     project_id: int
     project_name: str
     path: str
@@ -15,3 +16,4 @@ class Attachment:
 
     def __post_init__(self):
         self.processed = True if self.processed else False
+        self.issue_name = f'{self.project_name}-{self.issue_num}'

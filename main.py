@@ -124,7 +124,6 @@ class Worker:
                     await asyncio.sleep(60)
             logger.info('Цикл завершен, установка события завершения')
             event.set()
-            # todo название issue для отчета
             # todo проверка прав файла
             # todo формирование отчета (краткий, полный)
             # todo отчет в телегу
