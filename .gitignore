@@ -175,6 +175,4 @@ cython_debug/
 .idea
 jira
 jira-db
-
-
-*.sqlite
+*.csv
