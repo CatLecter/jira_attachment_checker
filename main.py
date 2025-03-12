@@ -104,9 +104,11 @@ class Worker:
                             path = os.path.join(
                                 '/home/tmpd/Projects/jira_attachment_checker/jira/data/attachments', a.path
                             )
-                            status = await check_file_status(a, path, settings.uid, settings.gid, settings.file_mode)
+                            status, disclaimer = await check_file_status(
+                                a, path, settings.uid, settings.gid, settings.file_mode
+                            )
                             logger.debug(f'Вложение {path} проверено, статус {status}')
-                            attachments_batch.append((a, path, status))
+                            attachments_batch.append((a, path, status, disclaimer))
 
                         logger.debug('Отметка батча вложений обработанными')
                         await self._sqlite_repo.update_attachments([a[0] for a in attachments_batch])
@@ -128,15 +130,26 @@ class Worker:
             raise e
 
     async def create_report(self):
-        logger.info("Запись файла отчетов")
+        logger.info('Запись файла отчетов')
         delimiter = ';'
-        columns = ['id', 'filename', 'full_path', 'status', 'project_name', 'issue_name']
+        columns = [
+            'id',
+            'filename',
+            'full_path',
+            'project_name',
+            'issue_name',
+            'is_missing',
+            'has_wrong_uid_or_gid',
+            'has_wrong_mode',
+            'has_wrong_size',
+            'summary',
+        ]
         reports = await self._sqlite_repo.get_reports()
         async with aiofiles.open('report.csv', 'a') as report_file:
             await report_file.write(f'{delimiter.join(columns)}\n')
             for r in reports:
                 await report_file.write(f'{delimiter.join([str(x) for x in r])}\n')
-        logger.info("Запись файла отчетов завершена")
+        logger.info('Запись файла отчетов завершена')
 
     async def _init_connections(self):
         logger.info('открытие соединений к базам')
@@ -188,9 +201,13 @@ def init_db(sqlite_dsn: str):
                 attachment_id integer primary key,
                 filename text,
                 full_path text,
-                status text,
                 project_name text,
-                issue_name text
+                issue_name text,
+                file_missing integer,
+                wrong_uid_gid integer,
+                wrong_mode integer,
+                wrong_size integer,
+                status text
             )
             """
         )

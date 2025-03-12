@@ -65,20 +65,41 @@ class SQLiteRepository(AbstractRepository):
         values = [(str(a.id),) for a in attachments]
         await self._connector.execute_many(f'update attachments set processed = 1 where attachment_id = ?', values)
 
-    async def save_attachment_reports(self, attachments: list[tuple[Attachment, str, str]]):
+    async def save_attachment_reports(self, attachments: list[tuple[Attachment, str, dict, str]]):
         values = []
-        for a, path, status in attachments:
-            values.append([a.id, a.filename, path, status, a.project_name,a.issue_name])
+        for a, path, status_dict, message in attachments:
+            values.append(
+                [
+                    a.id,
+                    a.filename,
+                    path,
+                    a.project_name,
+                    a.issue_name,
+                    status_dict.get('missing', False),
+                    status_dict.get('wrong_uid_gid', False),
+                    status_dict.get('wrong_mode', False),
+                    status_dict.get('wrong_size', False),
+                    message,
+                ]
+            )
             await self._connector.execute_many(
                 f"""
                         insert or ignore into reports(
                             attachment_id,
                             filename,
                             full_path,
-                            status,
                             project_name,
-                            issue_name
+                            issue_name,
+                            file_missing,
+                            wrong_uid_gid,
+                            wrong_mode,
+                            wrong_size,
+                            status
                         ) values (
+                            ?,
+                            ?,
+                            ?,
+                            ?,
                             ?,
                             ?,
                             ?,
@@ -147,10 +168,9 @@ class SQLiteRepository(AbstractRepository):
         return result
 
     async def get_reports(self):
-        rows = await self._connector.fetch_all(
-            'select * from reports;'
-        )
+        rows = await self._connector.fetch_all('select * from reports;')
         return rows
+
 
 async def test():
     repo = SQLiteRepository(await SQLiteConnector.create('test.db'))
