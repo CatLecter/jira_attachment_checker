@@ -4,6 +4,7 @@ import sqlite3
 import traceback
 from datetime import datetime
 
+import aiofiles
 from loguru import logger
 
 from db_utils.connectors.connectors import PGConnector, SQLiteConnector
@@ -35,9 +36,7 @@ class Worker:
             while not event.is_set():
                 logger.debug('Проверка запрета на работу (рабочие часы)')
                 current_hour = datetime.now().hour
-                self.running = not (
-                    self.stop_at <= current_hour < self.start_at
-                )  # вызов функции, которая отменит основной цикл?
+                self.running = not (self.stop_at <= current_hour < self.start_at)
                 logger.debug('Работа разрешена' if self.running else 'работа запрещена')
                 await asyncio.sleep(60)
             logger.debug('Завершение функции запрета на работу')
@@ -119,15 +118,25 @@ class Worker:
                     await asyncio.sleep(60)
             logger.info('Цикл завершен, установка события завершения')
             event.set()
+            await self.create_report()
             # todo формирование отчета (краткий, полный)
             # todo отчет в телегу
+            # todo запись базы sqlite
         except Exception as e:
             logger.error(f'Исключение {e}')
             logger.error(traceback.format_exc())
             raise e
 
     async def create_report(self):
-        raise NotImplementedError
+        logger.info("Запись файла отчетов")
+        delimiter = ';'
+        columns = ['id', 'filename', 'full_path', 'status', 'project_name', 'issue_name']
+        reports = await self._sqlite_repo.get_reports()
+        async with aiofiles.open('report.csv', 'a') as report_file:
+            await report_file.write(f'{delimiter.join(columns)}\n')
+            for r in reports:
+                await report_file.write(f'{delimiter.join([str(x) for x in r])}\n')
+        logger.info("Запись файла отчетов завершена")
 
     async def _init_connections(self):
         logger.info('открытие соединений к базам')
@@ -180,7 +189,8 @@ def init_db(sqlite_dsn: str):
                 filename text,
                 full_path text,
                 status text,
-                project_name text
+                project_name text,
+                issue_name text
             )
             """
         )

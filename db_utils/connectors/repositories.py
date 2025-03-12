@@ -68,7 +68,7 @@ class SQLiteRepository(AbstractRepository):
     async def save_attachment_reports(self, attachments: list[tuple[Attachment, str, str]]):
         values = []
         for a, path, status in attachments:
-            values.append([a.id, a.filename, path, status, a.project_name])
+            values.append([a.id, a.filename, path, status, a.project_name,a.issue_name])
             await self._connector.execute_many(
                 f"""
                         insert or ignore into reports(
@@ -76,8 +76,10 @@ class SQLiteRepository(AbstractRepository):
                             filename,
                             full_path,
                             status,
-                            project_name
+                            project_name,
+                            issue_name
                         ) values (
+                            ?,
                             ?,
                             ?,
                             ?,
@@ -144,6 +146,11 @@ class SQLiteRepository(AbstractRepository):
             result.append(Attachment(*row))
         return result
 
+    async def get_reports(self):
+        rows = await self._connector.fetch_all(
+            'select * from reports;'
+        )
+        return rows
 
 async def test():
     repo = SQLiteRepository(await SQLiteConnector.create('test.db'))
