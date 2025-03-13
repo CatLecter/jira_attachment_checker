@@ -5,6 +5,7 @@ import os.path
 
 from db_utils.connectors.connectors import AbstractConnector, SQLiteConnector
 from db_utils.models.models import Attachment
+from settings import settings
 
 
 class AbstractRepository(abc.ABC):
@@ -21,9 +22,9 @@ class AttachmentPGRepository(AbstractRepository):
         offset_str = f' offset {offset}' if offset else ''
         attachments = await self._connector.fetch_all(
             f"""
-            select fa.id as attachment_id, fa.filename, fa.filesize, fa.mimetype, ji.issuenum, p.id as project_id,
-            p.pkey as project_key,p.pname as project_name from fileattachment fa join jiraissue ji on ji.id = fa.issueid
-            join project p on p.id = ji.project{limit_str}{offset_str};
+            select fa.id as attachment_id, fa.filename, fa.filesize, fa.mimetype, ji.issuenum, ji.created, ji.updated,
+            p.id as project_id, p.pkey as project_key,p.pname as project_name from fileattachment fa join jiraissue ji
+            on ji.id = fa.issueid join project p on p.id = ji.project{limit_str}{offset_str};
             """
         )
         result = []
@@ -39,6 +40,8 @@ class AttachmentPGRepository(AbstractRepository):
             project_id = int(a.get('project_id'))
             file_size = int(a.get('filesize'))
             file_mime_type = a.get('mimetype')
+            created = a.get('created')
+            updated = a.get('updated')
             result.append(
                 Attachment(
                     attachment_id,
@@ -46,6 +49,8 @@ class AttachmentPGRepository(AbstractRepository):
                     file_size,
                     file_mime_type,
                     issue_num,
+                    created,
+                    updated,
                     project_id,
                     project_name,
                     path,
@@ -55,10 +60,8 @@ class AttachmentPGRepository(AbstractRepository):
 
 
 class SQLiteRepository(AbstractRepository):
-    time_format = '%Y-%m-%d %H:%M:%S'
-
     async def save_launch_time(self):
-        launch_time = datetime.datetime.now().strftime(self.time_format)
+        launch_time = datetime.datetime.now().strftime(settings.time_format)
         await self._connector.execute(f"update parameters set value = '{launch_time}' where name = 'launch_time';")
 
     async def update_attachments(self, attachments: list[Attachment]):
@@ -75,6 +78,8 @@ class SQLiteRepository(AbstractRepository):
                     path,
                     a.project_name,
                     a.issue_name,
+                    a.created.strftime(settings.time_format),
+                    a.updated.strftime(settings.time_format),
                     status_dict.get('missing', False),
                     status_dict.get('wrong_uid_gid', False),
                     status_dict.get('wrong_mode', False),
@@ -90,12 +95,16 @@ class SQLiteRepository(AbstractRepository):
                             full_path,
                             project_name,
                             issue_name,
+                            created,
+                            updated,
                             file_missing,
                             wrong_uid_gid,
                             wrong_mode,
                             wrong_size,
                             status
                         ) values (
+                            ?,
+                            ?,
                             ?,
                             ?,
                             ?,
@@ -115,7 +124,7 @@ class SQLiteRepository(AbstractRepository):
         records = await self._connector.fetch_one('select value from parameters where name="launch_time";')
         if records:
 
-            last_launch_time = datetime.datetime.strptime(records[0], self.time_format)
+            last_launch_time = datetime.datetime.strptime(records[0], settings.time_format)
             time_since_last_launch = datetime.datetime.now() - last_launch_time
 
             return time_since_last_launch.seconds
@@ -131,12 +140,14 @@ class SQLiteRepository(AbstractRepository):
                 file_size,
                 file_mime_type,
                 issue_num,
+                created,
+                updated,
                 project_id,
                 project_name,
                 path,
                 processed)
             values (
-                ?,?,?,?,?,?,?,?,?
+                ?,?,?,?,?,?,?,?,?,?,?
             );
             """,
             [
@@ -146,6 +157,8 @@ class SQLiteRepository(AbstractRepository):
                     a.file_size,
                     a.file_mime_type,
                     a.issue_num,
+                    a.created.strftime(settings.time_format),
+                    a.updated.strftime(settings.time_format),
                     a.project_id,
                     a.project_name,
                     a.path,

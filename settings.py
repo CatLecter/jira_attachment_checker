@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     file_mode: str
     start_at: int
     stop_at: int
+    time_format: str = '%Y-%m-%d %H:%M:%S'
 
 
 settings = Settings(_env_file='.env', _env_file_encoding='utf-8')
