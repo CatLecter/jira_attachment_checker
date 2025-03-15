@@ -5,3 +5,5 @@ loguru==0.7.3
 
 pydantic==2.10.6
 pydantic-settings==2.8.1
+
+aiogram==3.18.0

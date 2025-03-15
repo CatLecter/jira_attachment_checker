@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     start_at: int
     stop_at: int
     time_format: str = '%Y-%m-%d %H:%M:%S'
+    bot_token: str
 
 
 settings = Settings(_env_file='.env', _env_file_encoding='utf-8')
