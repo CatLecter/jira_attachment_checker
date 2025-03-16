@@ -2,9 +2,10 @@ import abc
 import asyncio
 import datetime
 import os.path
+from functools import reduce
 
-from db_utils.connectors.connectors import AbstractConnector, SQLiteConnector
-from db_utils.models.models import Attachment
+from db_utils.connectors import AbstractConnector, SQLiteConnector
+from db_utils.models import Attachment
 from settings import settings
 
 
@@ -67,6 +68,19 @@ class SQLiteRepository(AbstractRepository):
     async def update_attachments(self, attachments: list[Attachment]):
         values = [(str(a.id),) for a in attachments]
         await self._connector.execute_many(f'update attachments set processed = 1 where attachment_id = ?', values)
+
+    async def get_progress(self) -> str:
+        rows = await self._connector.fetch_all('select processed,count(*) from attachments group by processed;')
+        count_dict = {}
+        for row in rows:
+            count_dict[row[0]] = row[1]
+        total_items_count = reduce(lambda x, y: x + y, count_dict.values())
+        message = (
+            f'Обработано {count_dict.get(1, 0)} вложений из {total_items_count}, '
+            f'{100*(count_dict.get(1, 0) / total_items_count):.2f} %'
+        )
+        print(message)
+        return message
 
     async def save_attachment_reports(self, attachments: list[tuple[Attachment, str, dict, str]]):
         values = []

@@ -1,5 +1,4 @@
 import asyncio
-from asyncio import gather
 
 from aiogram import Bot, Dispatcher
 from aiogram.filters import Command
@@ -7,37 +6,36 @@ from aiogram.types import Message
 
 from settings import settings
 
-ids = [-4614214898, 376661040]
-
 
 class TGBot:
-    def __init__(self, token):
+    def __init__(self, token: str, chats: list[int]):
         self._bot = Bot(token=token)
+        self.chats = chats
         self._dp = Dispatcher()
-        self.process_message = self._dp.message(Command('get_id'))(self.process_message)
+        self.get_chat_id = self._dp.message(Command('get_chat_id'))(self.get_chat_id)   # noqa
+        self.progress_func = self._dp.message(Command('progress'))(self.get_progress)   # noqa
 
-    async def process_message(self, message: Message):
-        print(self)
-        print(message)
+    def set_progress_function(self, func):
+        self.progress_func = func
+
+    async def get_progress(self, message: Message):
+        result = await self.progress_func()
+        await message.reply(result)
+
+    async def get_chat_id(self, message: Message):
         message_parts = []
         if message.chat.type != 'private':
             message_parts.append(f'id группы - {message.chat.id}')
         message_parts.append(f'Ваш id - {message.from_user.id}')
         await message.reply('\n'.join(message_parts))
 
-    async def _wait(self):
-        await asyncio.sleep(10)
-        for i in ids:
-            await self._bot.send_message(i, 'hello')
+    async def run(self):
+        await self._dp.start_polling(self._bot)
 
-    async def main(self):
-        await asyncio.gather(self._dp.start_polling(self._bot), self._wait())
+    async def send_message(self, message_text: str):
+        for chat in self.chats:
+            await self._bot.send_message(chat, message_text)
 
-    async def send_message(self):
-        # await self._bot.send_message()
-        ...
-
-
-if __name__ == '__main__':
-    b = TGBot(settings.bot_token)
-    asyncio.run(b.main())
+    async def close(self):
+        await self._dp.stop_polling()
+        await self._bot.close()

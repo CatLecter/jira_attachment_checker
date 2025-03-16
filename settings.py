@@ -1,3 +1,5 @@
+import os.path
+
 from pydantic import PostgresDsn
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -16,6 +18,7 @@ class Settings(BaseSettings):
     stop_at: int
     time_format: str = '%Y-%m-%d %H:%M:%S'
     bot_token: str
+    chat_ids: list[int]
 
 
 settings = Settings(_env_file='.env', _env_file_encoding='utf-8')

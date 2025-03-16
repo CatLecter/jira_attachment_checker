@@ -2,7 +2,7 @@ from typing import AsyncGenerator
 
 import aiofiles.os
 
-from db_utils.models.models import Attachment
+from db_utils.models import Attachment
 
 
 async def attachments_aiter(attachments: list[Attachment]) -> AsyncGenerator[Attachment, None]:

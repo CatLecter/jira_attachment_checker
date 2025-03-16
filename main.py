@@ -1,22 +1,27 @@
 import asyncio
 import os
-import sqlite3
+import signal
 import traceback
+from asyncio import CancelledError, Task
 from datetime import datetime
 
 import aiofiles
 from loguru import logger
 
-from db_utils.connectors.connectors import PGConnector, SQLiteConnector
-from db_utils.connectors.repositories import AttachmentPGRepository, SQLiteRepository
+from bot.bot import TGBot
+from db_utils.connectors import PGConnector, SQLiteConnector
+from db_utils.repositories import AttachmentPGRepository, SQLiteRepository
+from db_utils.utils import init_db
 from file_utils.file_utils import attachments_aiter, check_file_status
 from settings import settings
 
 
 class Worker:
-    def __init__(self, sqlite_dsn: str, pg_dns: str, path: str, stop_at: int, start_at: int):
+    def __init__(
+        self, sqlite_dsn: str, pg_dns: str, path: str, stop_at: int, start_at: int, bot_token: str, chat_ids: list[int]
+    ):
         logger.debug('Создание экземпляра класса Worker')
-        self.running = False
+        self.pause: bool = True
         self.sqlite_dsn = sqlite_dsn
         self.pg_dsn = pg_dns
         self.path = path
@@ -25,48 +30,61 @@ class Worker:
         self._sqlite_repo: SQLiteRepository | None = None
         self._pg_repo: AttachmentPGRepository | None
         self._file_checker = None
+        self._bot_token = bot_token
+        self._chat_ids = chat_ids
+        self._tg_bot: TGBot | None = None
+        self._tasks: list[Task] = []
 
     async def get_attachments_from_jira_db(self):
         logger.info('получение списка вложений из базы Posgres Jira и помещение их в базу Sqlite')
         attachments = await self._pg_repo.get_file_attachments()
         await self._sqlite_repo.save_attachments(attachments)
 
-    async def check_working_hours(self, event: asyncio.Event):
+    async def check_working_hours(self):
         try:
-            while not event.is_set():
+            while True:
                 logger.debug('Проверка запрета на работу (рабочие часы)')
                 current_hour = datetime.now().hour
-                self.running = not (self.stop_at <= current_hour < self.start_at)
-                logger.debug('Работа разрешена' if self.running else 'работа запрещена')
+                self.pause = self.stop_at <= current_hour < self.start_at
+                logger.debug('Работа разрешена' if self.pause else 'работа запрещена')
                 await asyncio.sleep(60)
-            logger.debug('Завершение функции запрета на работу')
         except asyncio.CancelledError:
             logger.info('функция проверки запрета на работу отменена')
             return
 
     async def run(self):
-        event = asyncio.Event()
-        tasks = (
-            asyncio.create_task(self.check_working_hours(event)),
-            asyncio.create_task(self.check_attachments(event)),
+        await self._init_connections()
+        self._tasks.extend(
+            (
+                asyncio.create_task(self.check_working_hours()),
+                asyncio.create_task(self.check_attachments()),
+                asyncio.create_task(self._tg_bot.run()),
+            )
         )
+        await self._tg_bot.send_message('Скрипт начал работу')
         try:
-            await asyncio.gather(*tasks)
+            await asyncio.gather(*self._tasks)
         except Exception as e:
             logger.error(f'Исключение {e}, отмена задач')
             logger.error(traceback.format_exc())
-            for t in tasks:
+            for t in self._tasks:
                 t.cancel()
         finally:
             await self._release_connections()
+        await self._tg_bot.send_message('Скрипт закончил работу')
 
-    async def check_attachments(self, event: asyncio.Event):
+    async def get_info(self):
+        progress = await self._sqlite_repo.get_progress()
+        return progress
+
+    async def get_status(self):
+        ...
+
+    async def check_attachments(self):
         logger.info('Запуск функции проверки вложений')
-        await self._init_connections()
-        has_unprocessed_attachments = True
         try:
-            while has_unprocessed_attachments:
-                if self.running:
+            while True:
+                if not self.pause:
                     logger.debug('Итерация')
                     logger.debug('Проверка времени последнего запуска получения вложений из базы postgres')
                     seconds_since_tasks_gathered = await self._sqlite_repo.seconds_from_last_launch()
@@ -94,9 +112,10 @@ class Worker:
                             limit=settings.file_batch_size, offset=offset
                         )
                         if not attachments:
-                            logger.info('В базе отсутствуют необработанные вложения, работа цикла завершена')
-                            has_unprocessed_attachments = False
-                            event.set()
+                            msg = 'В базе отсутствуют необработанные вложения, пауза'
+                            logger.info(msg)
+                            await self._tg_bot.send_message(msg)
+                            await asyncio.sleep(60)
                             break
                         attachments_batch = []
                         logger.debug('Проверка на диске батча вложений')
@@ -114,16 +133,13 @@ class Worker:
                         await self._sqlite_repo.update_attachments([a[0] for a in attachments_batch])
                         logger.debug('Запись информации о батче вложений в таблицу reports sqlite')
                         await self._sqlite_repo.save_attachment_reports(attachments_batch)
+                        offset += settings.file_batch_size
                         logger.debug('Конец итерации')
                 else:
                     logger.info('Запрет на работу (рабочие часы)')
                     await asyncio.sleep(60)
-            logger.info('Цикл завершен, установка события завершения')
-            event.set()
-            await self.create_report()
-            # todo формирование отчета (краткий, полный)
-            # todo отчет в телегу
-            # todo запись базы sqlite
+        except CancelledError:
+            logger.info('Функция проверки вложений отменена')
         except Exception as e:
             logger.error(f'Исключение {e}')
             logger.error(traceback.format_exc())
@@ -154,9 +170,11 @@ class Worker:
         logger.info('Запись файла отчетов завершена')
 
     async def _init_connections(self):
-        logger.info('открытие соединений к базам')
+        logger.info('открытие соединений к базам, создание бота')
         self._sqlite_repo = SQLiteRepository(await SQLiteConnector.create(self.sqlite_dsn))
         self._pg_repo = AttachmentPGRepository(await PGConnector.create(self.pg_dsn))
+        self._tg_bot = TGBot(self._bot_token, self._chat_ids)
+        self._tg_bot.set_progress_function(self.get_info)
 
     async def _release_connections(self):
         logger.info('Закрытие соединений')
@@ -164,71 +182,47 @@ class Worker:
             await self._sqlite_repo.close()
             await self._pg_repo.close()
         except AttributeError:
-            logger.debug('Одно или несколько соединений не было установлено, пропуск.')
+            logger.debug('Одно или несколько соединений не было закрыто, пропуск.')
+
+    async def cancel(self):
+        msg = 'Завершение работы'
+        logger.info(msg)
+        await self._tg_bot.send_message(msg)
+        for t in self._tasks:
+            await t.cancel()
+        await self._release_connections()
 
 
-def init_db(sqlite_dsn: str):
-    logger.debug('Инициализация базы данных (создание таблиц, если не существуют)')
-    logger.debug(f'Создание подключения к sqlite по адресу {sqlite_dsn}')
-    con = sqlite3.connect(sqlite_dsn)
-    with con:
-        logger.debug('Создание таблицы attachments')
-        con.execute(
-            """
-            create table if not exists attachments (
-                attachment_id INTEGER PRIMARY KEY,
-                filename text NOT NULL,
-                file_size INTEGER,
-                file_mime_type text,
-                issue_num INTEGER,
-                created text,
-                updated text,
-                project_id INTEGER,
-                project_name text,
-                path text,
-                processed INTEGER
-            );
-            """
-        )
-        logger.debug('Создание таблицы parameters')
-        con.execute(
-            """
-            create table if not exists parameters (
-                name text unique,
-                value text default "");
-            """
-        )
-        logger.debug('Создание таблицы reports')
-        con.execute(
-            """
-            create table if not exists reports(
-                attachment_id integer primary key,
-                filename text,
-                full_path text,
-                project_name text,
-                issue_name text,
-                created text,
-                updated text,
-                file_missing integer,
-                wrong_uid_gid integer,
-                wrong_mode integer,
-                wrong_size integer,
-                status text
-            )
-            """
-        )
+async def main(worker: Worker):
+    try:
+        await worker.run()
+    except CancelledError:
+        print('cancelled')
 
 
-async def main():
-    w = Worker(
-        settings.sqlite_dsn, settings.postgres_dsn, settings.jira_files_path, settings.stop_at, settings.start_at
-    )
-    w.running = True
-    await w.run()
+def test():
+    print('test')
 
 
 if __name__ == '__main__':
     logger.info('Начало работы')
     init_db(settings.sqlite_dsn)
     logger.debug('Запуск главной функции')
-    asyncio.run(main())
+    w = Worker(
+        settings.sqlite_dsn,
+        settings.postgres_dsn,
+        settings.jira_files_path,
+        settings.stop_at,
+        settings.start_at,
+        settings.bot_token,
+        settings.chat_ids,
+    )
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    main_task = asyncio.ensure_future(main(w))
+    for sig in [signal.SIGINT, signal.SIGTERM]:
+        loop.add_signal_handler(sig, main_task.cancel, ...)
+    try:
+        loop.run_until_complete(main_task)
+    finally:
+        loop.close()
