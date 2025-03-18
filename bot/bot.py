@@ -2,7 +2,7 @@ import asyncio
 
 from aiogram import Bot, Dispatcher
 from aiogram.filters import Command
-from aiogram.types import Message
+from aiogram.types import BufferedInputFile, InputFile, Message
 
 from settings import settings
 
@@ -12,15 +12,23 @@ class TGBot:
         self._bot = Bot(token=token)
         self.chats = chats
         self._dp = Dispatcher()
-        self.get_chat_id = self._dp.message(Command('get_chat_id'))(self.get_chat_id)   # noqa
-        self.progress_func = self._dp.message(Command('progress'))(self.get_progress)   # noqa
+        self.get_chat_id = self._dp.message(Command('get_chat_id'))(self.get_chat_id)  # noqa
+        self.progress_func = self._dp.message(Command('progress'))(self.get_progress)  # noqa
+        self.report_func = self._dp.message(Command('report'))(self.get_report)
 
     def set_progress_function(self, func):
         self.progress_func = func
 
+    def set_report_function(self, func):
+        self.report_func = func
+
     async def get_progress(self, message: Message):
         result = await self.progress_func()
         await message.reply(result)
+
+    async def get_report(self, message: Message):
+        report: str = await self.report_func()
+        await message.answer_document(BufferedInputFile(report.encode('utf-8'), filename='report.csv'))
 
     async def get_chat_id(self, message: Message):
         message_parts = []

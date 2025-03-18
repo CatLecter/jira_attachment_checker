@@ -145,7 +145,7 @@ class Worker:
             logger.error(traceback.format_exc())
             raise e
 
-    async def create_report(self):
+    async def create_report_to_fs(self):
         logger.info('Запись файла отчетов')
         delimiter = ';'
         columns = [
@@ -169,12 +169,36 @@ class Worker:
                 await report_file.write(f'{delimiter.join([str(x) for x in r])}\n')
         logger.info('Запись файла отчетов завершена')
 
+    async def get_report_string(self):
+        report_parts = []
+        delimiter = ';'
+        columns = [
+            'id',
+            'filename',
+            'full_path',
+            'project_name',
+            'issue_name',
+            'created_at',
+            'updated_at',
+            'is_missing',
+            'has_wrong_uid_or_gid',
+            'has_wrong_mode',
+            'has_wrong_size',
+            'summary',
+        ]
+        report_parts.append(delimiter.join(columns))
+        report_rows = await self._sqlite_repo.get_reports()
+        for row in report_rows:
+            report_parts.append((delimiter.join(str(x) for x in row)))
+        return '\n'.join(report_parts)
+
     async def _init_connections(self):
         logger.info('открытие соединений к базам, создание бота')
         self._sqlite_repo = SQLiteRepository(await SQLiteConnector.create(self.sqlite_dsn))
         self._pg_repo = AttachmentPGRepository(await PGConnector.create(self.pg_dsn))
         self._tg_bot = TGBot(self._bot_token, self._chat_ids)
         self._tg_bot.set_progress_function(self.get_info)
+        self._tg_bot.set_report_function(self.get_report_string)
 
     async def _release_connections(self):
         logger.info('Закрытие соединений')
