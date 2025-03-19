@@ -2,7 +2,7 @@ import argparse
 
 from jira_utils import JiraAPIAdapter
 from lorem_text import lorem
-from utils import AbstractImageManager, LoremFlickrManager
+from utils import AbstractImageManager, FSImageManager, LoremFlickrManager
 
 
 def main(
@@ -87,6 +87,8 @@ def get_parser() -> argparse.ArgumentParser:
         default=3,
     )
 
+    p.add_argument('--path-to-images', help='Путь к папке с jpeg-изображениями', type=str)
+
     return p
 
 
@@ -94,7 +96,10 @@ if __name__ == '__main__':
     parser = get_parser()
     args = parser.parse_args()
     h = JiraAPIAdapter(args.base_url, args.jira_admin, args.jira_password)
-    im = LoremFlickrManager(args.image_download_timeout)
+    if args.path_to_images is not None:
+        im = FSImageManager('/home/tmpd/Nextcloud/archive/CAT_03/')
+    else:
+        im = LoremFlickrManager(args.image_dowload_timeout)
 
     main(
         h,
