@@ -27,8 +27,8 @@ class TGBot:
         await message.reply(result)
 
     async def get_report(self, message: Message):
-        report: str = await self.report_func()
-        await message.answer_document(BufferedInputFile(report.encode('utf-8'), filename='report.csv'))
+        summary, report = await self.report_func()
+        await message.answer_document(BufferedInputFile(report.encode('utf-8'), filename='report.csv'), caption=summary)
 
     async def get_chat_id(self, message: Message):
         message_parts = []

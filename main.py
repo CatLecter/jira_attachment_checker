@@ -188,9 +188,31 @@ class Worker:
         ]
         report_parts.append(delimiter.join(columns))
         report_rows = await self._sqlite_repo.get_reports()
+        summary_dict = {
+            'total': len(report_rows),
+            'missing': 0,
+            'wrong_uid_gid': 0,
+            'wrong_mode': 0,
+            'wrong_size': 0,
+        }
         for row in report_rows:
+            if row[7]:
+                summary_dict['missing'] += 1
+            if row[8]:
+                summary_dict['wrong_uid_gid'] += 1
+            if row[9]:
+                summary_dict['wrong_mode'] += 1
+            if row[10]:
+                summary_dict['wrong_size'] += 1
             report_parts.append((delimiter.join(str(x) for x in row)))
-        return '\n'.join(report_parts)
+        summary_msg = (
+            f"Всего файлов: {summary_dict.get('total')}\n"
+            f"Отсутствует файлов: {summary_dict.get('missing')}\n"
+            f"Файлов с неверным владельцем/группой: {summary_dict.get('wrong_uid_gid')}\n"
+            f"Файлов с неверными правами доступа: {summary_dict.get('wrong_mode')}\n"
+            f"Файлов с неверным размером: {summary_dict.get('wrong_size')}"
+        )
+        return summary_msg, '\n'.join(report_parts)
 
     async def _init_connections(self):
         logger.info('открытие соединений к базам, создание бота')
