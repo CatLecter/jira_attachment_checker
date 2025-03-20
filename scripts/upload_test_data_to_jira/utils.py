@@ -37,8 +37,8 @@ class FSImageManager(AbstractImageManager):
         self.index = 0
 
     def get_random_image(self, width: int, height: int):
+        self._increment_index()
         with open(self._files[self.index], 'rb') as img_file:
-            self._increment_index()
             return img_file.read()
 
     def _increment_index(self):

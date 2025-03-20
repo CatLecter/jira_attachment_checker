@@ -75,6 +75,13 @@ class JiraAPIAdapter:
         project = Project(project_json.get('id'), project_name, project_json.get('key'), project_json.get('self'))
         return project
 
+    def delete_project(self, project_id_or_key: str):
+        r: Response = self._session.delete(f'/project/{project_id_or_key}')
+        if r.status_code != 204:
+            print(f'Error deleting project {project_id_or_key}')
+            return
+        print(f'Project {project_id_or_key} deleted')
+
     def create_issue(
         self,
         project_key: str,
