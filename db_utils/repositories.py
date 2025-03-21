@@ -77,7 +77,7 @@ class SQLiteRepository(AbstractRepository):
         total_items_count = reduce(lambda x, y: x + y, count_dict.values())
         message = (
             f'Обработано {count_dict.get(1, 0)} вложений из {total_items_count}, '
-            f'{100*(count_dict.get(1, 0) / total_items_count):.2f} %'
+            f'{100 * (count_dict.get(1, 0) / total_items_count):.2f} %'
         )
         print(message)
         return message
@@ -133,6 +133,10 @@ class SQLiteRepository(AbstractRepository):
                     """,
                 values,
             )
+
+    async def get_total_attachments(self):
+        result = await self._connector.fetch_one('select count(*) from attachments;')
+        return result[0]
 
     async def seconds_from_last_launch(self) -> int:
         records = await self._connector.fetch_one('select value from parameters where name="launch_time";')

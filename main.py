@@ -46,7 +46,7 @@ class Worker:
                 logger.debug('Проверка запрета на работу (рабочие часы)')
                 current_hour = datetime.now().hour
                 self.pause = self.stop_at <= current_hour < self.start_at
-                logger.debug('Работа разрешена' if self.pause else 'работа запрещена')
+                logger.debug('Работа разрешена' if not self.pause else 'Работа запрещена')
                 await asyncio.sleep(60)
         except asyncio.CancelledError:
             logger.info('функция проверки запрета на работу отменена')
@@ -103,6 +103,11 @@ class Worker:
                                 break
                             await self._sqlite_repo.save_attachments(attachments)
                             offset += settings.pg_batch_size
+                    else:
+                        logger.debug(
+                            f'С последнего запуска прошло {seconds_since_tasks_gathered} '
+                            f'сек. (<{settings.fetch_tasks_period}'
+                        )
                     offset = 0
                     logger.info('Запуск основного цикла проверки вложений на диске')
                     while True:
@@ -189,7 +194,8 @@ class Worker:
         report_parts.append(delimiter.join(columns))
         report_rows = await self._sqlite_repo.get_reports()
         summary_dict = {
-            'total': len(report_rows),
+            'total': await self._sqlite_repo.get_total_attachments(),
+            'total_processed': len(report_rows),
             'missing': 0,
             'wrong_uid_gid': 0,
             'wrong_mode': 0,
@@ -206,7 +212,8 @@ class Worker:
                 summary_dict['wrong_size'] += 1
             report_parts.append((delimiter.join(str(x) for x in row)))
         summary_msg = (
-            f"Всего файлов: {summary_dict.get('total')}\n"
+            f"Всего файлов в БД Jira: {summary_dict.get('total')}\n"
+            f"Всего файлов обработано: {summary_dict.get('total_processed')}\n"
             f"Отсутствует файлов: {summary_dict.get('missing')}\n"
             f"Файлов с неверным владельцем/группой: {summary_dict.get('wrong_uid_gid')}\n"
             f"Файлов с неверными правами доступа: {summary_dict.get('wrong_mode')}\n"
