@@ -137,6 +137,25 @@ class JiraAPIAdapter:
             attachment_json.get('mimeType'),
         )
 
+    def get_all_issues(self, start_at, batch_size) -> list[Issue]:
+        issues: list[Issue] = []
+        print(start_at)
+        data = {'jql': '', 'fields': 'project', 'startAt': start_at, 'maxResults': batch_size}
+        r = self._session.get('/search', params=data)
+        self._check_response('get_all_issues', r)
+
+        issues_list = json.loads(r.text).get('issues', [])
+        if not issues_list:
+            return issues
+        for i in issues_list:
+            fields = i.get('fields')
+            issue_project = fields.get('project')
+            if not issue_project:
+                raise ValueError('no project got from issue')
+            issues.append(Issue(i.get('id'), i.get('key'), i.get('self'), issue_project.get('id')))
+        start_at += batch_size
+        return issues
+
     @staticmethod
     def _check_response(method_name: str, response: Response):
         if not response.status_code // 100 == 2:

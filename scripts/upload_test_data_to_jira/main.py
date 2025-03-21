@@ -13,20 +13,28 @@ def main(
     attachments_per_issue: int,
     project_name: str,
 ):
-    projects = []
-    for i in range(project_num):
-        projects.append(adapter.create_project(f'{project_name}{i}', 'software', 'admin'))
-    issues = []
-    for project in projects:
-        for i in range(issues_per_project):
-            issues.append(adapter.create_issue(project.key, lorem.words(2), lorem.words(5), 'Task'))
-    for issue in issues:
-        attachments = []
-        for i in range(attachments_per_issue):
-            img_bytes = image_manager.get_random_image(300, 300)
-            attachments.append(adapter.add_attachment(issue.issue_id, img_bytes, f'{lorem.words(1)}.png'))
-        for attachment in attachments:
-            adapter.add_comment_to_issue(issue.issue_id, f'{lorem.sentence()} !{attachment.filename}!')
+    # projects = []
+    # for i in range(project_num):
+    #     projects.append(adapter.create_project(f'{project_name}{i}', 'software', 'admin'))
+    # projects = adapter.get_all_projects()
+    # issues = []
+    # for project in projects:
+    #     for i in range(issues_per_project):
+    #         issues.append(adapter.create_issue(project.key, lorem.words(2), lorem.words(5), 'Task'))
+    start_at = 0
+    batch_size = 1000
+
+    while True:
+        issues = adapter.get_all_issues(start_at, batch_size)
+        if not issues:
+            break
+        for issue in issues:
+            attachments = []
+            for i in range(attachments_per_issue):
+                img_bytes = image_manager.get_random_image(300, 300)
+                attachments.append(adapter.add_attachment(issue.issue_id, img_bytes, f'{lorem.words(1)}.png'))
+            for attachment in attachments:
+                adapter.add_comment_to_issue(issue.issue_id, f'{lorem.sentence()} !{attachment.filename}!')
 
 
 def get_parser() -> argparse.ArgumentParser:
@@ -97,7 +105,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     h = JiraAPIAdapter(args.base_url, args.jira_admin, args.jira_password)
     if args.path_to_images is not None:
-        im = FSImageManager('/home/tmpd/Nextcloud/archive/CAT_03/')
+        im = FSImageManager(args.path_to_images)
     else:
         im = LoremFlickrManager(args.image_dowload_timeout)
 
