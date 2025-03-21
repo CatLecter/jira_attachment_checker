@@ -73,7 +73,7 @@ class Worker:
             await self._release_connections()
         await self._tg_bot.send_message('Скрипт закончил работу')
 
-    async def get_info(self):
+    async def get_progres(self):
         progress = await self._sqlite_repo.get_progress()
         return progress
 
@@ -174,9 +174,7 @@ class Worker:
                 await report_file.write(f'{delimiter.join([str(x) for x in r])}\n')
         logger.info('Запись файла отчетов завершена')
 
-    async def get_report_string(self):
-        report_parts = []
-        delimiter = ';'
+    async def get_report(self):
         columns = [
             'id',
             'filename',
@@ -191,17 +189,16 @@ class Worker:
             'has_wrong_size',
             'summary',
         ]
-        report_parts.append(delimiter.join(columns))
-        report_rows = await self._sqlite_repo.get_reports()
+        rows = await self._sqlite_repo.get_reports()
         summary_dict = {
             'total': await self._sqlite_repo.get_total_attachments(),
-            'total_processed': len(report_rows),
+            'total_processed': len(rows),
             'missing': 0,
             'wrong_uid_gid': 0,
             'wrong_mode': 0,
             'wrong_size': 0,
         }
-        for row in report_rows:
+        for row in rows:
             if row[7]:
                 summary_dict['missing'] += 1
             if row[8]:
@@ -210,8 +207,7 @@ class Worker:
                 summary_dict['wrong_mode'] += 1
             if row[10]:
                 summary_dict['wrong_size'] += 1
-            report_parts.append((delimiter.join(str(x) for x in row)))
-        summary_msg = (
+        summary = (
             f"Всего файлов в БД Jira: {summary_dict.get('total')}\n"
             f"Всего файлов обработано: {summary_dict.get('total_processed')}\n"
             f"Отсутствует файлов: {summary_dict.get('missing')}\n"
@@ -219,15 +215,15 @@ class Worker:
             f"Файлов с неверными правами доступа: {summary_dict.get('wrong_mode')}\n"
             f"Файлов с неверным размером: {summary_dict.get('wrong_size')}"
         )
-        return summary_msg, '\n'.join(report_parts)
+        return summary, columns, rows
 
     async def _init_connections(self):
         logger.info('открытие соединений к базам, создание бота')
         self._sqlite_repo = SQLiteRepository(await SQLiteConnector.create(self.sqlite_dsn))
         self._pg_repo = AttachmentPGRepository(await PGConnector.create(self.pg_dsn))
         self._tg_bot = TGBot(self._bot_token, self._chat_ids)
-        self._tg_bot.set_progress_function(self.get_info)
-        self._tg_bot.set_report_function(self.get_report_string)
+        self._tg_bot.set_progress_function(self.get_progres)
+        self._tg_bot.set_report_function(self.get_report)
 
     async def _release_connections(self):
         logger.info('Закрытие соединений')
