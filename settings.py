@@ -1,5 +1,6 @@
 import os.path
 
+from loguru import logger
 from pydantic import PostgresDsn
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -20,6 +21,7 @@ class Settings(BaseSettings):
     bot_token: str
     chat_ids: list[int]
     delimiter: str = ';'
+    tg_max_file_size: int = 50 * 1024 * 1024
 
 
 settings = Settings(_env_file='.env', _env_file_encoding='utf-8')

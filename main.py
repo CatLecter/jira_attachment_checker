@@ -6,14 +6,13 @@ from asyncio import CancelledError, Task
 from datetime import datetime
 
 import aiofiles
-from loguru import logger
 
 from bot.bot import TGBot
 from db_utils.connectors import PGConnector, SQLiteConnector
 from db_utils.repositories import AttachmentPGRepository, SQLiteRepository
 from db_utils.utils import init_db
 from file_utils.file_utils import attachments_aiter, check_file_status
-from settings import settings
+from settings import logger, settings
 
 
 class Worker:
@@ -119,7 +118,6 @@ class Worker:
                         if not attachments:
                             msg = 'В базе отсутствуют необработанные вложения, пауза'
                             logger.info(msg)
-                            await self._tg_bot.send_message(msg)
                             await asyncio.sleep(60)
                             break
                         attachments_batch = []
@@ -176,18 +174,18 @@ class Worker:
 
     async def get_report(self):
         columns = [
-            'id',
-            'filename',
-            'full_path',
-            'project_name',
-            'issue_name',
-            'created_at',
-            'updated_at',
-            'is_missing',
-            'has_wrong_uid_or_gid',
-            'has_wrong_mode',
-            'has_wrong_size',
-            'summary',
+            ('id', 'integer primary key'),
+            ('filename', 'text'),
+            ('full_path', 'text'),
+            ('project_name', 'text'),
+            ('issue_name', 'text'),
+            ('created_at', 'text'),
+            ('updated_at', 'text'),
+            ('is_missing', 'bool'),
+            ('has_wrong_uid_or_gid', 'bool'),
+            ('has_wrong_mode', 'bool'),
+            ('has_wrong_size', 'bool'),
+            ('summary', 'text'),
         ]
         rows = await self._sqlite_repo.get_reports()
         summary_dict = {
