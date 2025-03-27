@@ -195,19 +195,25 @@ class Worker:
             'wrong_uid_gid': 0,
             'wrong_mode': 0,
             'wrong_size': 0,
+            'total_with_problems': 0,
         }
         for row in rows:
             if row[7]:
                 summary_dict['missing'] += 1
+                summary_dict['total_with_problems'] += 1
             if row[8]:
                 summary_dict['wrong_uid_gid'] += 1
+                summary_dict['total_with_problems'] += 1
             if row[9]:
                 summary_dict['wrong_mode'] += 1
+                summary_dict['total_with_problems'] += 1
             if row[10]:
                 summary_dict['wrong_size'] += 1
+                summary_dict['total_with_problems'] += 1
         summary = (
             f"Всего файлов в БД Jira: {summary_dict.get('total')}\n"
             f"Всего файлов обработано: {summary_dict.get('total_processed')}\n"
+            f"Всего из обработанных файлов с проблемами: {summary_dict.get('total_with_problems')}"
             f"Отсутствует файлов: {summary_dict.get('missing')}\n"
             f"Файлов с неверным владельцем/группой: {summary_dict.get('wrong_uid_gid')}\n"
             f"Файлов с неверными правами доступа: {summary_dict.get('wrong_mode')}\n"

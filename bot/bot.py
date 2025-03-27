@@ -118,7 +118,8 @@ class TGBot:
         if report_size > settings.tg_max_file_size:
             logger.debug('Отчет csv слишком большой')
             await message.answer(
-                f'Файл отчета слишком большой для отправки через Telegram ({report_size / 1024} кб). '
+                f'Файл отчета слишком большой для отправки через '
+                f'Telegram ({"%.2f" % (report_size / 1024 / 1024)} кб). '
                 f'Обратитесь к системному администратору для получения файла {f_name_full}, '
                 f'либо получите файл отчета по частям.\nПолучить файл по частям?',
                 reply_markup=ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text='Да'), KeyboardButton(text='Нет')]]),
@@ -135,25 +136,33 @@ class TGBot:
         message_text = message.text
         if message_text == 'Да':
             await state.set_state(ParseState.work_in_progress)
-            await message.answer(
-                'Отчет генерируется частями по 50 мб, пожалуйста подождите', reply_markup=ReplyKeyboardRemove()
-            )
             logger.debug('Функция отправки отчета csv по частям')
             columns = await state.get_value('columns')
             col_names = (c[0] for c in columns)
             rows = await state.get_value('rows')
             filename = await state.get_value('filename')
+            row_bytes = []
+            total_size = 0
+            for r in rows:
+                r_b = f'{settings.delimiter.join(str(r))}\n'.encode('utf-8')
+                row_bytes.append(r_b)
+                total_size += len(r_b)
+            threshold = 15000
+            msg_num = total_size // (settings.tg_max_file_size - threshold)
+            await message.answer(
+                f'Отчет генерируется частями по 50 мб. Ожидается {msg_num} частей. Пожалуйста подождите',
+                reply_markup=ReplyKeyboardRemove(),
+            )
             ext = 'csv'
             row_index = 0
             report_num = 1
             has_next = True
-            threshold = 15000
             while has_next:
                 msg_bytes = bytearray(f'{settings.delimiter.join(col_names)}\n'.encode('utf-8'))
                 while len(msg_bytes) < (settings.tg_max_file_size - threshold):
-                    msg_bytes.extend(f'{settings.delimiter.join(str(rows[row_index]))}\n'.encode('utf-8'))
+                    msg_bytes.extend(f'{settings.delimiter.join(str(row_bytes[row_index]))}\n'.encode('utf-8'))
                     row_index += 1
-                    if row_index >= len(rows):
+                    if row_index >= len(row_bytes):
                         has_next = False
                         break
 
