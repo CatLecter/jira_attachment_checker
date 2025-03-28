@@ -1,4 +1,5 @@
 import datetime
+import math
 from typing import Callable
 
 import aiofiles
@@ -111,15 +112,14 @@ class TGBot:
         async with aiofiles.open(f_name_full, 'w') as f:
             await f.write(f'{settings.delimiter.join(col_names)}\n')
             for row in rows:
-                row = str(row)
-                await f.write(f'{settings.delimiter.join(row)}\n')
+                await f.write(f'{settings.delimiter.join(map(lambda x: str(x), row))}\n')
 
         report_size = await aiofiles.os.path.getsize(f_name_full)
         if report_size > settings.tg_max_file_size:
             logger.debug('Отчет csv слишком большой')
             await message.answer(
                 f'Файл отчета слишком большой для отправки через '
-                f'Telegram ({"%.2f" % (report_size / 1024 / 1024)} кб). '
+                f'Telegram ({"%.2f" % (report_size / 1024 / 1024)} Мб). '
                 f'Обратитесь к системному администратору для получения файла {f_name_full}, '
                 f'либо получите файл отчета по частям.\nПолучить файл по частям?',
                 reply_markup=ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text='Да'), KeyboardButton(text='Нет')]]),
@@ -144,13 +144,13 @@ class TGBot:
             row_bytes = []
             total_size = 0
             for r in rows:
-                r_b = f'{settings.delimiter.join(str(r))}\n'.encode('utf-8')
+                r_b = f'{settings.delimiter.join(map(lambda x: str(x), r))}\n'.encode('utf-8')
                 row_bytes.append(r_b)
                 total_size += len(r_b)
             threshold = 15000
-            msg_num = total_size // (settings.tg_max_file_size - threshold)
+            msg_num = math.ceil(total_size / (settings.tg_max_file_size - threshold))
             await message.answer(
-                f'Отчет генерируется частями по 50 мб. Ожидается {msg_num} частей. Пожалуйста подождите',
+                f'Отчет генерируется частями по 50 Мб. Ожидается {msg_num} частей. Пожалуйста подождите',
                 reply_markup=ReplyKeyboardRemove(),
             )
             ext = 'csv'
@@ -160,7 +160,7 @@ class TGBot:
             while has_next:
                 msg_bytes = bytearray(f'{settings.delimiter.join(col_names)}\n'.encode('utf-8'))
                 while len(msg_bytes) < (settings.tg_max_file_size - threshold):
-                    msg_bytes.extend(f'{settings.delimiter.join(str(row_bytes[row_index]))}\n'.encode('utf-8'))
+                    msg_bytes.extend(row_bytes[row_index])
                     row_index += 1
                     if row_index >= len(row_bytes):
                         has_next = False
@@ -171,6 +171,7 @@ class TGBot:
                 await message.answer_document(BufferedInputFile(bytes(msg_bytes), filename=part_filename))
                 report_num += 1
             await state.set_state(ParseState.idle)
+            await message.answer('Готово!')
         elif message_text == 'Нет':
             await message.answer('Операция отменена.', reply_markup=ReplyKeyboardRemove())
             await state.set_state(ParseState.idle)
@@ -197,7 +198,8 @@ class TGBot:
             await message.answer_document(FSInputFile(db_file, filename='db.sqlite'))
         else:
             await message.answer(
-                f'Файл базы данных слишком большой для отправки через Telegram ({db_size} б).'
+                f'Файл базы данных слишком большой для отправки '
+                f'через Telegram ({"%.2f" % (db_size / 1024 / 1024)} Мб).'
                 f'Обратитесь к системному администратору для получения файла {db_file}',
                 reply_markup=ReplyKeyboardRemove(),
             )

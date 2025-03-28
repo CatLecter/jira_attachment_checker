@@ -1,8 +1,6 @@
-import os.path
-
-from loguru import logger
+from loguru import logger as l
 from pydantic import PostgresDsn
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
@@ -25,3 +23,4 @@ class Settings(BaseSettings):
 
 
 settings = Settings(_env_file='.env', _env_file_encoding='utf-8')
+logger = l

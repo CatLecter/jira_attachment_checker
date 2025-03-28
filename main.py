@@ -213,7 +213,7 @@ class Worker:
         summary = (
             f"Всего файлов в БД Jira: {summary_dict.get('total')}\n"
             f"Всего файлов обработано: {summary_dict.get('total_processed')}\n"
-            f"Всего из обработанных файлов с проблемами: {summary_dict.get('total_with_problems')}"
+            f"Всего из обработанных файлов с проблемами: {summary_dict.get('total_with_problems')}\n"
             f"Отсутствует файлов: {summary_dict.get('missing')}\n"
             f"Файлов с неверным владельцем/группой: {summary_dict.get('wrong_uid_gid')}\n"
             f"Файлов с неверными правами доступа: {summary_dict.get('wrong_mode')}\n"
