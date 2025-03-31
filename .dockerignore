@@ -1,0 +1,12 @@
+.venv
+scripts/
+.env
+example.env
+.gitignore
+.pre-commit-config.yml
+.python-version
+*.sqlite
+*.csv
+docker-compose.yml
+LICENSE
+README.md

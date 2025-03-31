@@ -1,5 +1,6 @@
 import datetime
 import math
+import os.path
 from typing import Callable
 
 import aiofiles
@@ -109,7 +110,8 @@ class TGBot:
         await message.answer(summary)
         col_names = (c[0] for c in columns)
         f_name_full = f'{f_name}.csv'
-        async with aiofiles.open(f_name_full, 'w') as f:
+        report_path = os.path.join('reports', f_name_full)
+        async with aiofiles.open(report_path, 'w') as f:
             await f.write(f'{settings.delimiter.join(col_names)}\n')
             for row in rows:
                 await f.write(f'{settings.delimiter.join(map(lambda x: str(x), row))}\n')
@@ -128,7 +130,7 @@ class TGBot:
         else:
             logger.debug('Отправка отчета csv')
             await message.answer_document(
-                FSInputFile(f_name_full, filename='report.csv'), reply_markup=ReplyKeyboardRemove()
+                FSInputFile(report_path, filename='report.csv'), reply_markup=ReplyKeyboardRemove()
             )
             await state.set_state(ParseState.idle)
 
@@ -186,16 +188,17 @@ class TGBot:
         rows = await state.get_value('rows')
         filename = await state.get_value('filename')
         db_file = f'{filename}.sqlite'
-        async with aiosqlite.connect(db_file) as db:
+        db_path = os.path.join('reports', db_file)
+        async with aiosqlite.connect(db_path) as db:
             q_col_names_with_types = ','.join((f'{c[0]} {c[1]}' for c in columns))
             q_col_names = ','.join((f'{c[0]} ' for c in columns))
             q_values = ','.join(['?'] * len(columns))
             await db.execute(f'create table if not exists reports({q_col_names_with_types})')
             await db.executemany(f'insert into reports ({q_col_names}) values ({q_values});', rows)
             await db.commit()
-        db_size = await aiofiles.os.path.getsize(db_file)
+        db_size = await aiofiles.os.path.getsize(db_path)
         if db_size < settings.tg_max_file_size:
-            await message.answer_document(FSInputFile(db_file, filename='db.sqlite'))
+            await message.answer_document(FSInputFile(db_path, filename='db.sqlite'))
         else:
             await message.answer(
                 f'Файл базы данных слишком большой для отправки '
