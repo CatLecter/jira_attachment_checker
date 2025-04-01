@@ -10,3 +10,6 @@ example.env
 docker-compose.yml
 LICENSE
 README.md
+jira/
+jira-db/
+reports/

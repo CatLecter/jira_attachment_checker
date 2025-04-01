@@ -123,9 +123,7 @@ class Worker:
                         attachments_batch = []
                         logger.debug('Проверка на диске батча вложений')
                         async for a in attachments_aiter(attachments):
-                            path = os.path.join(
-                                '/home/tmpd/Projects/jira_attachment_checker/jira/data/attachments', a.path
-                            )
+                            path = os.path.join(settings.jira_files_path, a.path)
                             status, disclaimer = await check_file_status(
                                 a, path, settings.uid, settings.gid, settings.file_mode
                             )

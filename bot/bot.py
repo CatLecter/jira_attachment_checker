@@ -116,7 +116,7 @@ class TGBot:
             for row in rows:
                 await f.write(f'{settings.delimiter.join(map(lambda x: str(x), row))}\n')
 
-        report_size = await aiofiles.os.path.getsize(f_name_full)
+        report_size = await aiofiles.os.path.getsize(report_path)
         if report_size > settings.tg_max_file_size:
             logger.debug('Отчет csv слишком большой')
             await message.answer(

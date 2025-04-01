@@ -1,3 +1,4 @@
+from dotenv import load_dotenv
 from loguru import logger as l
 from pydantic import PostgresDsn
 from pydantic_settings import BaseSettings
@@ -22,5 +23,6 @@ class Settings(BaseSettings):
     tg_max_file_size: int = 50 * 1024 * 1024
 
 
-settings = Settings(_env_file='.env', _env_file_encoding='utf-8')
+load_dotenv()
+settings = Settings()
 logger = l
