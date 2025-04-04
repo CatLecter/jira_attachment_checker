@@ -72,15 +72,17 @@ class SQLiteRepository(AbstractRepository):
     async def get_progress(self) -> str:
         rows = await self._connector.fetch_all('select processed,count(*) from attachments group by processed;')
         count_dict = {}
-        for row in rows:
-            count_dict[row[0]] = row[1]
-        total_items_count = reduce(lambda x, y: x + y, count_dict.values())
-        message = (
-            f'Обработано {count_dict.get(1, 0)} вложений из {total_items_count}, '
-            f'{100 * (count_dict.get(1, 0) / total_items_count):.2f} %'
-        )
-        print(message)
-        return message
+        if rows:
+            for row in rows:
+                count_dict[row[0]] = row[1]
+            total_items_count = reduce(lambda x, y: x + y, count_dict.values())
+            message = (
+                f'Обработано {count_dict.get(1, 0)} вложений из {total_items_count}, '
+                f'{100 * (count_dict.get(1, 0) / total_items_count):.2f} %'
+            )
+            return message
+        else:
+            return 'Во внутренней базе отсутствуют записи о вложениях.'
 
     async def save_attachment_reports(self, attachments: list[tuple[Attachment, str, dict, str]]):
         values = []
