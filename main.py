@@ -44,7 +44,12 @@ class Worker:
             while True:
                 logger.debug('Проверка запрета на работу (рабочие часы)')
                 current_hour = datetime.now().hour
-                self.pause = self.stop_at <= current_hour < self.start_at
+                new_pause = self.stop_at <= current_hour < self.start_at
+                if self.pause and not new_pause:
+                    await self._tg_bot.send_message('Запрет на работу снят, скрипт начал работу.')
+                elif not self.pause and new_pause:
+                    await self._tg_bot.send_message('Запрет на работу, работа скрипта приостановлена.')
+                self.pause = new_pause
                 logger.debug('Работа разрешена' if not self.pause else 'Работа запрещена')
                 await asyncio.sleep(60)
         except asyncio.CancelledError:
@@ -60,7 +65,7 @@ class Worker:
                 asyncio.create_task(self._tg_bot.run()),
             )
         )
-        await self._tg_bot.send_message('Скрипт начал работу')
+        await self._tg_bot.send_message('Скрипт запущен')
         try:
             await asyncio.gather(*self._tasks)
         except Exception as e:
@@ -77,7 +82,7 @@ class Worker:
         return progress
 
     async def get_status(self):
-        ...
+        ...   # todo status_handler
 
     async def check_attachments(self):
         logger.info('Запуск функции проверки вложений')
