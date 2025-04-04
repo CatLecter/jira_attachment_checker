@@ -67,8 +67,9 @@ class TGBot:
         else:
             await message.answer('Получение данных из базы, пожалуйста подождите.')
             summary, columns, rows = await self.report_handler()
+            await message.answer(summary)
             f_name = f'report_{datetime.datetime.now().strftime(settings.time_format)}'
-            await state.update_data(columns=columns, rows=rows, filename=f_name, summary=summary)
+            await state.update_data(columns=columns, rows=rows, filename=f_name)
             await message.answer(
                 'В каком виде нужно предоставить отчет?',
                 reply_markup=ReplyKeyboardMarkup(
@@ -104,10 +105,8 @@ class TGBot:
         await state.set_state(ParseState.work_in_progress)
         logger.debug('Функция формирования отчета csv')
         columns = await state.get_value('columns')
-        summary = await state.get_value('summary')
         rows = await state.get_value('rows')
         f_name = await state.get_value('filename')
-        await message.answer(summary)
         col_names = (c[0] for c in columns)
         f_name_full = f'{f_name}.csv'
         report_path = os.path.join('reports', f_name_full)
