@@ -210,13 +210,13 @@ class TGBot:
     async def get_chat_id(self, message: Message):
         message_parts = []
         if message.chat.type != 'private':
-            message_parts.append(f'id группы - {message.chat.id}')
-        message_parts.append(f'Ваш id - {message.from_user.id}')
+            message_parts.append(f'id группы: {message.chat.id}')
+        message_parts.append(f'Ваш id: {message.from_user.id}')
         await message.reply('\n'.join(message_parts))
 
     async def run(self):
         logger.info('Запуск бота')
-        await self._dp.start_polling(self._bot)
+        await self._dp.start_polling(self._bot, handle_signals=False)
 
     async def send_message(self, message_text: str):
         logger.debug(f'Отправка сообщения {message_text}')
