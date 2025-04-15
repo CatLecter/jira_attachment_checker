@@ -3,6 +3,7 @@ from typing import AsyncGenerator
 import aiofiles.os
 
 from db_utils.models import Attachment
+from settings import logger
 
 
 async def attachments_aiter(attachments: list[Attachment]) -> AsyncGenerator[Attachment, None]:
@@ -14,7 +15,9 @@ async def check_file_status(attachment: Attachment, full_path: str, uid: int, gi
     # ( missing, uid/guid, mode, wrong_size), message
     message_parts = []
     result = {'missing': False, 'wrong_uid_gid': False, 'wrong_mode': False, 'wrong_size': False}
+    logger.debug(f'проверка наличия файла по пути full_path: {full_path}')
     exists = await aiofiles.os.path.exists(full_path)
+    logger.debug(f"файл {'' if exists else 'не'} обнаружен")
     if not exists:
         message_parts.append('missing')
         result['missing'] = True
