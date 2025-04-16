@@ -4,6 +4,7 @@ services:
     env_file: ".env"
     volumes:
       - ./reports:/app/reports
-      - ./jira/data/attachments:/app/attachments
+      - ${JIRA_FILES_PATH}:/app/attachments
+    environment:
+      JIRA_FILES_PATH: "/app/attachments"
     network_mode: host
-#    user: "2001:2001"
