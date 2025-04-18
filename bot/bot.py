@@ -26,6 +26,8 @@ class TGBot:
         self._dp.message.register(self.report_command, Command('report'))
         self._dp.message.register(self.cancel, Command('cancel'))
         self._dp.message.register(self.choose_csv_sqlite, ParseState.csv_sqlite)
+        self._dp.message.register(self.csv_report, ParseState.csv)
+        self._dp.message.register(self.choose_csv_full_short, ParseState.csv_full_short)
         self._dp.message.register(self.csv_too_large, ParseState.csv_too_large)
         self._dp.message.register(self.work_in_progress, ParseState.work_in_progress)
         self.progress_handler: Callable | None = None
@@ -63,13 +65,12 @@ class TGBot:
                 'Начат процесс получения отчета. Для отмены отправьте команду /cancel',
                 reply_markup=ReplyKeyboardRemove(),
             )
-            # todo cancel processing
         else:
             await message.answer('Получение данных из базы, пожалуйста подождите.')
-            summary, columns, rows = await self.report_handler()
+            summary, columns, rows_full, rows_short = await self.report_handler()
             await message.answer(summary)
             f_name = f'report_{datetime.datetime.now().strftime(settings.time_format)}'
-            await state.update_data(columns=columns, rows=rows, filename=f_name)
+            await state.update_data(columns=columns, rows_full=rows_full, rows_short=rows_short, filename=f_name)
             await message.answer(
                 'В каком виде нужно предоставить отчет?',
                 reply_markup=ReplyKeyboardMarkup(
@@ -83,9 +84,9 @@ class TGBot:
         text = message.text
         if text == 'csv':
             logger.debug('Выбран тип отчета csv')
-            await state.set_state(ParseState.csv)
+            await state.set_state(ParseState.csv_full_short)
             await message.reply('Выбран тип отчета csv', reply_markup=ReplyKeyboardRemove())
-            await self.csv_report(message, state)
+            await self.choose_csv_full_short(message, state)
         elif text == 'sqlite':
             logger.debug('Выбран тип отчета sqlite')
             await state.set_state(ParseState.sqlite)
@@ -96,19 +97,44 @@ class TGBot:
             await message.answer(
                 'Пожалуйста, выберите формат отчета.',
                 reply_markup=ReplyKeyboardMarkup(
-                    keyboard=[[KeyboardButton(text='csv'), KeyboardButton(text='sqlite')]]
+                    keyboard=[[KeyboardButton(text='csv'), KeyboardButton(text='sqlite')]], resize_keyboard=True
                 ),
             )
 
+    async def choose_csv_full_short(self, message: Message, state: FSMContext):
+        await message.answer(
+            'Выберите тип отчета:\n'
+            'Полный - отчет по всем файлам в базе\n'
+            'Сокращенный - отчет только по файлам, имеющим проблемы',
+            reply_markup=ReplyKeyboardMarkup(
+                keyboard=[[KeyboardButton(text='Полный'), KeyboardButton(text='Сокращенный')]], resize_keyboard=True
+            ),
+        )
+        await state.set_state(ParseState.csv)
+
     async def csv_report(self, message: Message, state: FSMContext):
+        text = message.text
+
+        if text == 'Полный':
+            full = True
+        elif text == 'Сокращенный':
+            full = False
+        else:
+            await message.answer(
+                'Пожалуйста, выберите тип отчета',
+                reply_markup=ReplyKeyboardMarkup(
+                    keyboard=[[KeyboardButton(text='Полный'), KeyboardButton(text='Сокращенный')]], resize_keyboard=True
+                ),
+            )
+            return
         await message.answer('Отчет генерируется, пожалуйста подождите.', reply_markup=ReplyKeyboardRemove())
         await state.set_state(ParseState.work_in_progress)
         logger.debug('Функция формирования отчета csv')
         columns = await state.get_value('columns')
-        rows = await state.get_value('rows')
+        rows = await state.get_value('rows_full') if full else await state.get_value('rows_short')
         f_name = await state.get_value('filename')
         col_names = (c[0] for c in columns)
-        f_name_full = f'{f_name}.csv'
+        f_name_full = f'{"full" if full else "short"}_{f_name}.csv'
         report_path = os.path.join('reports', f_name_full)
         async with aiofiles.open(report_path, 'w') as f:
             await f.write(f'{settings.delimiter.join(col_names)}\n')
@@ -123,7 +149,9 @@ class TGBot:
                 f'Telegram ({"%.2f" % (report_size / 1024 / 1024)} Мб). '
                 f'Обратитесь к системному администратору для получения файла {f_name_full}, '
                 f'либо получите файл отчета по частям.\nПолучить файл по частям?',
-                reply_markup=ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text='Да'), KeyboardButton(text='Нет')]]),
+                reply_markup=ReplyKeyboardMarkup(
+                    keyboard=[[KeyboardButton(text='Да'), KeyboardButton(text='Нет')]], resize_keyboard=True
+                ),
             )
             await state.set_state(ParseState.csv_too_large)
         else:

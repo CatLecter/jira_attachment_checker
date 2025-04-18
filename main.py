@@ -168,7 +168,7 @@ class Worker:
             'has_wrong_size',
             'summary',
         ]
-        reports = await self._sqlite_repo.get_reports()
+        reports = await self._sqlite_repo.get_reports_full()
         async with aiofiles.open('report.csv', 'a') as report_file:
             await report_file.write(f'{delimiter.join(columns)}\n')
             for r in reports:
@@ -190,17 +190,18 @@ class Worker:
             ('has_wrong_size', 'bool'),
             ('summary', 'text'),
         ]
-        rows = await self._sqlite_repo.get_reports()
+        rows_full = await self._sqlite_repo.get_reports_full()
+        rows_short = await self._sqlite_repo.get_report_short()
         summary_dict = {
             'total': await self._sqlite_repo.get_total_attachments(),
-            'total_processed': len(rows),
+            'total_processed': len(rows_full),
             'missing': 0,
             'wrong_uid_gid': 0,
             'wrong_mode': 0,
             'wrong_size': 0,
             'total_with_problems': 0,
         }
-        for row in rows:
+        for row in rows_short:
             if row[7]:
                 summary_dict['missing'] += 1
                 summary_dict['total_with_problems'] += 1
@@ -222,7 +223,7 @@ class Worker:
             f"Файлов с неверными правами доступа: {summary_dict.get('wrong_mode')}\n"
             f"Файлов с неверным размером: {summary_dict.get('wrong_size')}"
         )
-        return summary, columns, rows
+        return summary, columns, rows_full, rows_short
 
     async def _init_connections(self):
         logger.info('открытие соединений к базам, создание бота')

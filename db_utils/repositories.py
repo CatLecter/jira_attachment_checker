@@ -200,8 +200,18 @@ class SQLiteRepository(AbstractRepository):
             result.append(Attachment(*row))
         return result
 
-    async def get_reports(self):
+    async def get_reports_full(self):
         rows = await self._connector.fetch_all('select * from reports;')
+        return rows
+
+    async def get_report_short(self):
+        rows = await self._connector.fetch_all(
+            'select * from reports where '
+            'file_missing = 1 '
+            'or wrong_uid_gid = 1 '
+            'or wrong_mode = 1 '
+            'or wrong_size = 1;'
+        )
         return rows
 
 

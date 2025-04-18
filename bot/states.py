@@ -9,3 +9,4 @@ class ParseState(StatesGroup):
     csv_too_large = State()
     csv_parts = State()
     work_in_progress = State()
+    csv_full_short = State()
