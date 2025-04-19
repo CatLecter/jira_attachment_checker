@@ -1,10 +1,16 @@
 services:
   jira-script:
     build: .
+    deploy:
+      resources:
+        limits:
+          cpus: ${CPU_LIMIT}
+          memory: ${MEMORY_LIMIT}
     env_file: ".env"
     volumes:
       - ./reports:/app/reports
       - ${JIRA_FILES_PATH}:/app/attachments
     environment:
       JIRA_FILES_PATH: "/app/attachments"
+      JIRA_FILES_ACTUAL_PATH: ${JIRA_FILES_PATH}
     network_mode: host
