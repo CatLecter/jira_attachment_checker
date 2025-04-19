@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     sqlite_dsn: str
     postgres_dsn: PostgresDsn
     jira_files_path: str
+    jira_files_actual_path: str | None = None
     uid: int
     gid: int
     file_mode: str
@@ -21,6 +22,11 @@ class Settings(BaseSettings):
     chat_ids: list[int]
     delimiter: str = ';'
     tg_max_file_size: int = 50 * 1024 * 1024
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        if not self.jira_files_actual_path:
+            self.jira_files_actual_path = self.jira_files_path
 
 
 load_dotenv()

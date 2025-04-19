@@ -82,7 +82,7 @@ class Worker:
         return progress
 
     async def get_status(self):
-        ...   # todo status_handler
+        ...  # todo status_handler
 
     async def check_attachments(self):
         logger.info('Запуск функции проверки вложений')
@@ -133,7 +133,9 @@ class Worker:
                                 a, path, settings.uid, settings.gid, settings.file_mode
                             )
                             logger.debug(f'Вложение {path} проверено, статус {status}')
-                            attachments_batch.append((a, path, status, disclaimer))
+                            attachments_batch.append(
+                                (a, os.path.join(settings.jira_files_actual_path, a.path), status, disclaimer)
+                            )
 
                         logger.debug('Отметка батча вложений обработанными')
                         await self._sqlite_repo.update_attachments([a[0] for a in attachments_batch])
